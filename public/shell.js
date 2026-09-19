@@ -22,19 +22,19 @@ window.AXON = (() => {
   }
 
   // ---------- formatters
-  const fmtUsd = n => n == null || !isFinite(n) ? '—' : n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(2)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(1)+'K' : n >= 1 ? '$'+n.toFixed(2) : n === 0 ? '$0.00' : subscript(n);
+  const fmtUsd = n => n == null || !isFinite(n) ? '...' : n >= 1e9 ? '$'+(n/1e9).toFixed(2)+'B' : n >= 1e6 ? '$'+(n/1e6).toFixed(2)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(1)+'K' : n >= 1 ? '$'+n.toFixed(2) : n === 0 ? '$0.00' : subscript(n);
   function subscript(n) { // 0.0₅443 style for tiny prices
     const s = n.toExponential(2); const [m, e] = s.split('e'); const exp = -parseInt(e,10);
     if (exp <= 3) return '$' + n.toFixed(Math.min(8, exp+2));
     const zeros = exp - 1; const digits = m.replace('.','').slice(0,3);
     return '$0.0' + String(zeros).replace(/\d/g, d => '₀₁₂₃₄₅₆₇₈₉'[d]) + digits;
   }
-  const fmtEth = (wei, dp=4) => wei == null ? '—' : (Number(BigInt(wei)) / 1e18).toFixed(dp).replace(/\.?0+$/,'') || '0';
+  const fmtEth = (wei, dp=4) => wei == null ? '...' : (Number(BigInt(wei)) / 1e18).toFixed(dp).replace(/\.?0+$/,'') || '0';
   const fromWei = wei => (Number(BigInt(wei))/1e18).toString();
   const toWei = v => { const [w, f=''] = String(v).trim().split('.'); if (!/^\d*$/.test(w) || !/^\d*$/.test(f) || (w===''&&f==='')) throw Error('Enter a valid amount.'); return (BigInt(w||'0')*10n**18n + BigInt((f+'0'.repeat(18)).slice(0,18))).toString(); };
   const ago = ts => { const s = Math.max(0, Date.now()/1000 - ts); if (s<60) return Math.floor(s)+'s'; if (s<3600) return Math.floor(s/60)+'m'; if (s<86400) return Math.floor(s/3600)+'h'; return (s/86400).toFixed(s<86400*10?1:0).replace(/\.0$/,'')+'d'; };
   const short = a => a ? a.slice(0,6)+'…'+a.slice(-4) : '';
-  const pct = x => x == null ? '—' : (x*100).toFixed(x*100 < 10 ? 1 : 0) + '%';
+  const pct = x => x == null ? '...' : (x*100).toFixed(x*100 < 10 ? 1 : 0) + '%';
   function toast(m, ms=3200) { const t = document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
 
   // ---------- wallet
@@ -97,7 +97,7 @@ window.AXON = (() => {
     $('#connect')?.addEventListener('click', () => openWalletModal().catch(e => e.message !== 'Cancelled.' && toast(e.message)));
     $('#acct')?.addEventListener('click', () => { if (confirm('Disconnect this wallet from the page?')) { state.provider = null; state.address = null; session = null; localStorage.removeItem('axon.wallet'); api('auth/logout', {}).catch(()=>{}); renderNav(); } });
     $('#burger')?.addEventListener('click', () => $('#navm').classList.toggle('open'));
-    const f = $('#footer'); if (f) f.innerHTML = `<div class="wrap"><span>Not investment advice. Launch tokens can lose all value. pons v2 is unaudited.</span><span><a href="${href('/docs')}">How it works</a> · <a href="${CHAIN.explorer}/address/0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" target="_blank" rel="noopener">pons v2 factory ↗</a> · <a href="${href('/leaderboard')}">Leaderboards</a></span></div>`;
+    const f = $('#footer'); if (f) f.innerHTML = `<div class="wrap fgrid"><div><p class="eyebrow">${BRAND}</p><p class="ftxt">Every trade fires a thought. Tokens on pons v2, Robinhood Chain. Inference through OpenRouter.</p></div><div><p class="eyebrow">Contracts</p><p class="ftxt"><a class="mono" href="${CHAIN.explorer}/address/0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" target="_blank" rel="noopener">factory 0x7eD598Bc…</a></p></div><div><p class="eyebrow">Read</p><p class="ftxt flinks"><a href="${href('/live')}">Live</a><a href="${href('/explore')}?view=compare">Compare</a><a href="${href('/leaderboard')}">Leaderboards</a><a href="${href('/takes')}">Notes</a><a href="${href('/scoreboard')}">Agora</a><a href="${href('/offspring')}">Offspring</a><a href="${href('/scoreboard')}">Scoreboard</a><a href="${href('/docs')}">How it works</a><a href="${href('/docs')}#mcp">MCP</a><a href="${href('/docs')}#risks">Risks</a></p></div></div><div class="wrap"><p class="eyebrow" style="padding-bottom:2rem">Not investment advice. Launch tokens can lose all value. pons v2 is unaudited.</p></div>`;
   }
   async function autoReconnect() {
     const want = localStorage.getItem('axon.wallet'); if (!want) return;

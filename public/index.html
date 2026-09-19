@@ -6,14 +6,14 @@
 <section class="hero">
   <div>
     <div class="eyebrow">Tokens that fund a model</div>
-    <h1 style="margin-top:.6rem">Tokens<br>with <em>a spend.</em></h1>
+    <h1 style="margin-top:.6rem">Tokens<br>with <em>a mind.</em></h1>
     <p class="lede">{{DESCRIPTION}}</p>
     <div class="actions"><a class="btn" id="cta-launch" href="launch">Launch a token →</a><a class="btn ghost" href="explore">See the markets</a></div>
     <div class="chip mint" style="margin-top:1.25rem">trade · 2% → compute pool</div>
   </div>
   <div>
     <div class="eyebrow" style="margin-bottom:.6rem">Back a model</div>
-    <div class="models" id="roster"><div class="model skeleton">loading</div><div class="model skeleton">loading</div><div class="model skeleton">loading</div><div class="model skeleton">loading</div></div>
+    <div class="model-chips" id="roster"><a href="launch?model=openai%2Fgpt-6-astra"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/openai.com.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">GPT-6 Astra</span><span>OpenAI</span></a><a href="launch?model=anthropic%2Fclaude-fable-5.1"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/anthropic.com.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">Claude Fable 5.1</span><span>Anthropic</span></a><a href="launch?model=google%2Fgemma-4-26b-a4b-it"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/google.com.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">Gemma 4 26B A4B</span><span>Google</span></a><a href="launch?model=x-ai%2Fgrok-4.6"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/x.ai.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">Grok 4.6</span><span>xAI</span></a><a href="launch?model=deepseek%2Fdeepseek-v4.1-flash"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/deepseek.com.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">DeepSeek V4.1 Flash</span><span>DeepSeek</span></a><a href="launch?model=meta-llama%2Fllama-guard-4-12b"><span class="ic"><img src="https://icons.duckduckgo.com/ip3/meta.com.ico" alt="" width="18" height="18" loading="lazy"></span><span class="mn">Llama Guard 4 12B</span><span>Meta</span></a></div>
     <div class="grid c4" style="margin-top:1rem" id="stats">
       <div class="card stat"><div class="k">Compute raised</div><div class="v" data-k="raisedUsd">·</div></div>
       <div class="card stat"><div class="k">Available</div><div class="v" data-k="availableUsd">·</div></div>
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const usd = v => v == null ? '·' : fmtUsd(v);
   api('models').then(({ models, usage }) => {
     const top = models.slice(0, 6);
-    document.getElementById('roster').innerHTML = top.map(m => `<a class="model" href="${href('/launch')}?model=${encodeURIComponent(m.id)}"><span><span class="n">${esc(m.name)}</span><br><span class="p">${esc(m.provider)}</span></span><span class="chip">${usage.launches[m.id] || 0}</span></a>`).join('');
+    if (top.length) document.getElementById('roster').innerHTML = top.map(m => `<a href="${href('/launch')}?model=${encodeURIComponent(m.id)}"><span class="ic">${m.icon ? `<img src="${esc(m.icon)}" alt="" width="18" height="18" loading="lazy">` : ''}</span><span class="mn">${esc(m.name)}</span><span>${esc(m.provider)}</span></a>`).join('');
   }).catch(() => {});
   api('stats').then(s => { for (const el of document.querySelectorAll('[data-k]')) { const k = el.dataset.k; el.textContent = k === 'launches' ? s.launches : usd(s[k]); } }).catch(() => {});
   api('tokens?sort=new&limit=10').then(({ tokens }) => {

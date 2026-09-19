@@ -50,7 +50,7 @@ def refresh(force=False):
         if not force and time.time() - _ix['at'] < 45: return {'skipped': True}
         st = chain.status()
         if not st.get('ok'): return {'error': st.get('error')}
-        head = st['block']; start = _ix['lastBlock'] or (head - 20000); adopted = 0
+        head = st['block']; start = _ix['lastBlock'] or (head - 400000); adopted = 0
         for a in range(start, head + 1, 9000):
             try: logs = chain.launch_logs(a, hex(min(a + 8999, head)))
             except Exception: logs = []
@@ -58,8 +58,8 @@ def refresh(force=False):
                 if l['token'].lower() in TOKENS: continue
                 try:
                     snap = chain.token_snapshot(l['token'])
-                    if snap['fundedByAxon']:
-                        rec = _record(snap, None, '', '', l['tx'], l['block']); TOKENS[rec['token'].lower()] = rec; adopted += 1
+                    if adopted < 200:
+                        rec = _record(snap, None, '', '', l['tx'], l['block']); rec['native'] = bool(snap['fundedByAxon']); TOKENS[rec['token'].lower()] = rec; adopted += 1
                         store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
                 except Exception: pass
         _ix['lastBlock'] = head; _ix['at'] = time.time()
