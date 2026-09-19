@@ -19,6 +19,14 @@ class Response:
         self._json = None
 
     @property
+    def content(self):
+        return self.text.encode() if isinstance(self.text, str) else self.text
+
+    def raise_for_status(self):
+        if not (200 <= self.status_code < 300):
+            raise RuntimeError(f'HTTP {self.status_code}')
+
+    @property
     def ok(self):
         return 200 <= self.status_code < 300
 
