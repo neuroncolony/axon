@@ -10,7 +10,9 @@ from urllib.parse import urlparse, parse_qs
 ROOT = Path(__file__).resolve().parent.parent
 WORKSPACE = Path('/data/workspace')
 sys.path.insert(0, str(WORKSPACE)); sys.path.insert(0, str(ROOT / 'server'))
-from dotenv import load_dotenv; load_dotenv(WORKSPACE / '.env', override=False)
+try:
+    from dotenv import load_dotenv; load_dotenv(WORKSPACE / '.env', override=False)
+except Exception: pass
 import chain, store, models as MODELS, pool
 from eth_account.messages import encode_defunct
 from eth_account import Account

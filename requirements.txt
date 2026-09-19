@@ -1,0 +1,4 @@
+python-dotenv
+eth-account>=0.10
+eth-abi>=4
+eth-utils>=2
