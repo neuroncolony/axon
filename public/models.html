@@ -21,15 +21,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     g.innerHTML = models.map(m => {
       const launches = (usage.launches && usage.launches[m.id]) || 0;
       const spent = usage.spentUsd ? usage.spentUsd[m.id] : null;
-      return `<div class="card"><div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap"><b>${esc(m.name)}</b><span class="chip">${esc(m.provider)}</span>${m.tag ? `<span class="chip mint">${esc(m.tag)}</span>` : ''}</div>
-        <div class="grid c3" style="margin-top:.75rem;gap:.5rem">
+      return `<div class="card"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(m.name)}</b><span class="chip">${esc(m.provider)}</span>${m.tag ? `<span class="chip mint">${esc(m.tag)}</span>` : ''}</div>
+        <div class="grid c3" style="margin-top:.75rem;gap:8px">
           <div><div class="k faint" style="font-size:.72rem">Context</div><div class="mono">${ctx(m.ctx)}</div></div>
           <div><div class="k faint" style="font-size:.72rem">In / 1M</div><div class="mono">${price(m.in)}</div></div>
           <div><div class="k faint" style="font-size:.72rem">Out / 1M</div><div class="mono">${price(m.out)}</div></div>
         </div>
-        <div style="display:flex;gap:1rem;margin-top:.75rem;font-size:.8rem;color:var(--muted)"><span>${launches} launch${launches === 1 ? '' : 'es'} backing it</span><span>${fmtUsd(spent)} spent on inference</span></div>
-        <div style="display:flex;gap:.5rem;margin-top:.9rem"><a class="btn sm accent" href="${href('/launch')}?model=${encodeURIComponent(m.id)}">Launch with this model</a><a class="btn sm ghost" href="${href('/chat')}?model=${encodeURIComponent(m.id)}">Chat</a></div></div>`;
+        <div style="display:flex;gap:16px;margin-top:.75rem;font-size:14px;color:var(--muted)"><span>${launches} launch${launches === 1 ? '' : 'es'} backing it</span><span>${fmtUsd(spent)} spent on inference</span></div>
+        <div style="display:flex;gap:8px;margin-top:.9rem"><a class="btn sm accent" href="${href('/launch')}?model=${encodeURIComponent(m.id)}">Launch with this model</a><a class="btn sm ghost" href="${href('/chat')}?model=${encodeURIComponent(m.id)}">Chat</a></div></div>`;
     }).join('');
-  }).catch(e => { document.getElementById('grid').innerHTML = `<div class="notice error">${esc(e.message)}</div>`; });
+  }).catch(e => { document.getElementById('grid').innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; });
 });
 </script></body></html>

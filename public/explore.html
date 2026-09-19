@@ -11,9 +11,9 @@
     <button data-sort="volume">Volume</button>
     <button data-sort="graduation">Graduation</button>
   </div>
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem">
-    <select id="f-model" style="padding:.5rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface)"><option value="">All models</option></select>
-    <select id="f-status" style="padding:.5rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface)"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem">
+    <select id="f-model" class="sel"><option value="">All models</option></select>
+    <select id="f-status" class="sel"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
   </div>
   <div class="table-wrap"><table class="table"><thead><tr><th>Token</th><th>Backs</th><th class="num">Price</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="faint">Reading the chain…</td></tr></tbody></table></div>
 </section>

@@ -18,7 +18,7 @@
       <p class="hint" style="margin-top:1rem">Trades are counted when made through this site. Trades made elsewhere are not indexed yet.</p>
     </div>
     <div>
-      <div class="grid" style="grid-template-columns:1fr;gap:.75rem" id="stats">
+      <div class="grid" style="grid-template-columns:1fr;gap:12px" id="stats">
         <div class="card stat"><div class="k">Compute raised</div><div class="v" data-k="raisedUsd">n/a</div></div>
         <div class="card stat"><div class="k">Available</div><div class="v" data-k="availableUsd">n/a</div></div>
         <div class="card stat"><div class="k">Spent</div><div class="v" data-k="spentUsd">n/a</div></div>
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           : 'launched';
         return `<div class="feed-item"><div class="t">${ago(e.at)}</div><div><div class="who"><b><a href="${href('/token/' + e.token)}">$${esc(e.symbol || short(e.token))}</a></b>${e.model ? `<span class="chip">${esc(e.model.split('/')[1])}</span>` : ''}<span>${what}</span>${link}</div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`;
       }).join('');
-    }).catch(e => { document.getElementById('feed').innerHTML = `<div class="notice error">${esc(e.message)}</div>`; });
+    }).catch(e => { document.getElementById('feed').innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; });
   }
   function loadStats() {
     api('stats').then(s => { for (const el of document.querySelectorAll('#stats [data-k]')) { const k = el.dataset.k; el.textContent = k === 'launches' ? (s.launches ?? 'n/a') : usd(s[k]); } }).catch(() => {});

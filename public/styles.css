@@ -172,3 +172,22 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 @media(max-width:560px){.grid.c2,.grid.c3,.grid.c4,.fgrid{grid-template-columns:1fr}.wrap{padding:0 14px}.section{margin-top:40px}.table th,.table td{padding:12px 12px}.nav .pill .btn.accent{display:none}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}.hero-in[data-appear],.model-chips[data-appear]{opacity:1;transform:none}}
 @media(prefers-reduced-transparency:reduce){.nav[data-stuck] .pill,.nav-mobile{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}}
+/* inner pages */
+.page-intro{text-align:center;max-width:760px;margin:40px auto;display:grid;justify-items:center}
+.page-intro h1{max-width:16ch;font-size:clamp(40px,4.6vw,64px)}
+.page-intro .lede{margin:18px 0 0;font-family:var(--head);font-size:clamp(18px,1.8vw,24px);line-height:1.3;font-weight:500;color:var(--ink-80);text-wrap:balance}
+.page-intro .eyebrow{display:block}
+.docs .prose{margin:0 auto}.split>.card{align-self:start}
+.sel,select.sel{height:40px;padding:0 36px 0 14px;border:0;border-radius:14px;background:var(--wash-1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230b1a33' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 14px center;box-shadow:0 0 0 1px var(--line);font-family:var(--head);font-weight:500;font-size:15px;color:var(--ink);appearance:none;-webkit-appearance:none;outline:0;cursor:pointer;transition:box-shadow .4s var(--ease)}
+.sel:focus{box-shadow:0 0 0 2px var(--blue-ring)}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.card h2,.card h3{margin-bottom:8px}.card>p{margin:0 0 12px;color:var(--ink-80)}
+.section-head h2{font-size:clamp(26px,2.6vw,36px)}
+.page .grid.c4 .card,.page .grid.c3 .card{padding:18px 20px}
+/* table + feed atoms */
+.tok .logo,.table .logo{width:32px;height:32px;border-radius:10px;background:var(--blue-soft);box-shadow:0 0 0 1px var(--line);object-fit:cover;flex:none;display:inline-block}
+.tok .n{color:var(--ink)}
+.feed-item{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start}
+.feed-item .t{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px;white-space:nowrap}
+.feed-item .who{margin-bottom:6px}.feed-item .who a{color:var(--ink)}
+@media(max-width:560px){.feed-item{grid-template-columns:1fr}.feed-item .t{padding-top:0}}
