@@ -1,0 +1,35 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Models</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="static/styles.css"><script src="static/shell.js" defer></script></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap">
+<section class="section">
+  <div class="section-head"><div><div class="eyebrow">Catalogue</div><h2>Models</h2></div></div>
+  <p class="muted" style="max-width:44rem">Models are routed through OpenRouter and billed at list price per token. A model that is not on OpenRouter cannot be selected. Launch a token to back a model: the fees it earns become compute that holders can spend talking to it.</p>
+  <div class="grid c2" id="grid" style="margin-top:1.25rem"><div class="card faint">Reading the catalogue…</div></div>
+</section>
+</div></main>
+<footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, href } = AXON;
+  const ctx = n => n == null ? 'n/a' : n >= 1e6 ? (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + 'M' : Math.round(n / 1e3) + 'K';
+  const price = v => v == null ? 'n/a' : '$' + (v >= 1 ? v.toFixed(2) : v.toFixed(4)) + '/M';
+  api('models').then(({ models, usage }) => {
+    const g = document.getElementById('grid');
+    if (!models.length) { g.innerHTML = '<div class="empty">No models are listed yet.</div>'; return; }
+    g.innerHTML = models.map(m => {
+      const launches = (usage.launches && usage.launches[m.id]) || 0;
+      const spent = usage.spentUsd ? usage.spentUsd[m.id] : null;
+      return `<div class="card"><div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap"><b>${esc(m.name)}</b><span class="chip">${esc(m.provider)}</span>${m.tag ? `<span class="chip mint">${esc(m.tag)}</span>` : ''}</div>
+        <div class="grid c3" style="margin-top:.75rem;gap:.5rem">
+          <div><div class="k faint" style="font-size:.72rem">Context</div><div class="mono">${ctx(m.ctx)}</div></div>
+          <div><div class="k faint" style="font-size:.72rem">In / 1M</div><div class="mono">${price(m.in)}</div></div>
+          <div><div class="k faint" style="font-size:.72rem">Out / 1M</div><div class="mono">${price(m.out)}</div></div>
+        </div>
+        <div style="display:flex;gap:1rem;margin-top:.75rem;font-size:.8rem;color:var(--muted)"><span>${launches} launch${launches === 1 ? '' : 'es'} backing it</span><span>${fmtUsd(spent)} spent on inference</span></div>
+        <div style="display:flex;gap:.5rem;margin-top:.9rem"><a class="btn sm accent" href="${href('/launch')}?model=${encodeURIComponent(m.id)}">Launch with this model</a><a class="btn sm ghost" href="${href('/chat')}?model=${encodeURIComponent(m.id)}">Chat</a></div></div>`;
+    }).join('');
+  }).catch(e => { document.getElementById('grid').innerHTML = `<div class="notice error">${esc(e.message)}</div>`; });
+});
+</script></body></html>

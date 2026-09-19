@@ -1,0 +1,32 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Leaderboards</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="static/styles.css"><script src="static/shell.js" defer></script></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap">
+<div class="section-head"><div><div class="eyebrow">Ranked</div><h2 style="font-size:1.75rem">Leaderboards</h2></div><a href="explore">All markets →</a></div>
+<div class="tabs" id="tabs"><button class="active" data-t="tokens">Tokens</button><button data-t="launchers">Launchers</button><button data-t="models">Models</button></div>
+<div id="sub" class="tabs" style="border:0;margin:-.5rem 0 .75rem"><button class="active" data-by="mcap">Market cap</button><button data-by="volume">24h volume</button><button data-by="graduation">Graduation</button></div>
+<div class="table-wrap"><table class="table"><thead id="th"></thead><tbody id="tb"><tr><td class="faint">Reading the chain…</td></tr></tbody></table></div>
+<p class="faint" style="font-size:.75rem;margin-top:.75rem">Market caps use a live spot quote and the ETH price. Volume counts trades made through this site only. Compute spent is the sum of billed replies at list price.</p>
+</div></main><footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, ago, short, pct, href } = AXON; const usd = v => v == null ? 'n/a' : fmtUsd(v);
+  const EXP = AXON.CHAIN.explorer; let tab = 'tokens', by = 'mcap'; const models = (await api('models').catch(() => ({ models: [] }))).models; const name = id => (models.find(m => m.id === id) || {}).name || id;
+  const th = document.getElementById('th'), tb = document.getElementById('tb');
+  async function load() {
+    document.getElementById('sub').style.display = tab === 'tokens' ? '' : 'none';
+    let d; try { d = await api('leaderboard?by=' + by); } catch (e) { tb.innerHTML = `<tr><td class="down">${esc(e.message)}</td></tr>`; return; }
+    if (tab === 'tokens') { th.innerHTML = '<tr><th>#</th><th>Token</th><th>Backs</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th></tr>';
+      tb.innerHTML = d.tokens.length ? d.tokens.map((t, i) => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td class="mono faint">${i + 1}</td><td><div class="tok">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || 'n/a')}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : 'n/a'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td></tr>`).join('') : '<tr><td colspan="7"><div class="empty">No tokens yet.</div></td></tr>'; }
+    else if (tab === 'launchers') { th.innerHTML = '<tr><th>#</th><th>Wallet</th><th class="num">Launches</th><th class="num">Combined mkt cap</th><th class="num">Compute spent</th></tr>';
+      tb.innerHTML = d.launchers.length ? d.launchers.map((l, i) => `<tr><td class="mono faint">${i + 1}</td><td><a class="mono" href="${EXP}/address/${l.address}" target="_blank" rel="noopener">${short(l.address)} ↗</a></td><td class="num">${l.launches}</td><td class="num">${usd(l.marketCapUsd)}</td><td class="num">${usd(l.spentUsd)}</td></tr>`).join('') : '<tr><td colspan="5"><div class="empty">No launchers yet.</div></td></tr>'; }
+    else { const ids = [...new Set([...Object.keys(d.models.launches), ...Object.keys(d.models.spentUsd)])].sort((a, b) => (d.models.spentUsd[b] || 0) - (d.models.spentUsd[a] || 0) || (d.models.launches[b] || 0) - (d.models.launches[a] || 0));
+      th.innerHTML = '<tr><th>#</th><th>Model</th><th class="num">Tokens backing it</th><th class="num">Compute spent</th><th></th></tr>';
+      tb.innerHTML = ids.length ? ids.map((id, i) => `<tr><td class="mono faint">${i + 1}</td><td><span class="n">${esc(name(id))}</span><br><span class="mono faint" style="font-size:.7rem">${esc(id)}</span></td><td class="num">${d.models.launches[id] || 0}</td><td class="num">${usd(d.models.spentUsd[id] || 0)}</td><td><a class="btn sm ghost" href="${href('/launch')}?model=${encodeURIComponent(id)}">Launch</a></td></tr>`).join('') : '<tr><td colspan="5"><div class="empty">No model has been backed yet.</div></td></tr>'; }
+  }
+  document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; tab = b.dataset.t; for (const x of e.currentTarget.children) x.classList.toggle('active', x === b); load(); };
+  document.getElementById('sub').onclick = e => { const b = e.target.closest('button'); if (!b) return; by = b.dataset.by; for (const x of e.currentTarget.children) x.classList.toggle('active', x === b); load(); };
+  load();
+});
+</script></body></html>

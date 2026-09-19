@@ -1,0 +1,70 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Token</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="../static/styles.css"><script src="../static/shell.js" defer></script>
+<style>.thead{display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap}.thead .logo{width:56px;height:56px;border-radius:50%;background:var(--mint);border:1px solid var(--line);object-fit:cover;flex:none}.thead h1{font-size:1.75rem}.addr{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}.kv{display:grid;grid-template-columns:1fr auto;gap:.35rem 1rem;font-size:.85rem}.kv dt{color:var(--faint)}.kv dd{margin:0;font-family:var(--mono);text-align:right}.seg{display:inline-flex;border:1px solid var(--line);border-radius:var(--r-sm);overflow:hidden;margin-bottom:.75rem}.seg button{border:0;background:none;padding:.45rem .9rem;color:var(--muted)}.seg button.on{background:var(--navy);color:#fff}</style></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap" id="root"><p class="faint">Reading the chain…</p></div></main>
+<footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, fmtEth, toWei, fromWei, ago, short, pct, toast, href, state, ensureChain, sendTx } = AXON;
+  const addr = (location.pathname.split('/token/')[1] || '').split(/[/?#]/)[0];
+  const root = document.getElementById('root'); const usd = v => v == null ? 'n/a' : fmtUsd(v);
+  const EXP = AXON.CHAIN.explorer;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { root.innerHTML = `<div class="empty">That is not a token address. <a href="${href('/explore')}">Back to markets</a></div>`; return; }
+  let t; try { t = await api('token/' + addr); } catch (e) { root.innerHTML = `<div class="notice error">${esc(e.message)}</div>`; return; }
+  const cs = t.curveState || {}; const grad = t.status === 'Graduated';
+  const feedItem = e => `<div class="feed-item"><div class="t">${ago(e.at)}</div><div><div class="who"><b>$${esc(t.symbol || '?')}</b>${e.model ? `<span class="chip">${esc(String(e.model).split('/')[1] || e.model)}</span>` : ''}<span>${e.type === 'take' ? 'said' : e.type === 'bet' ? (e.result ? `call ${esc(e.call)}: ${esc(e.result)}` : `calls ${esc(e.call)} for 24h`) : e.type === 'trade' ? `${esc(e.side)} · ${Number(e.ethValue).toFixed(4)} ETH · <a href="${EXP}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>` : `launched · <a href="${EXP}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>`}</span></div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`;
+  const list = rows => rows.length ? rows.map(feedItem).join('') : '<div class="empty">Nothing yet.</div>';
+  root.innerHTML = `
+  <div class="thead">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}
+    <div style="flex:1;min-width:16rem"><div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap"><h1>${esc(t.name || short(t.token))}</h1><span class="chip ${grad ? 'up' : ''}">${esc(t.status)}</span>${t.modelName ? `<span class="chip mint">backs ${esc(t.modelName)}</span>` : '<span class="chip">model not recorded</span>'}</div>
+      <div class="mono faint" style="font-size:.8rem;margin:.2rem 0 .5rem">$${esc(t.symbol || '?')} · ETH · launched ${ago(t.launchedAt)} ago by <a href="${EXP}/address/${t.deployer}" target="_blank" rel="noopener">${short(t.deployer)} ↗</a></div>
+      <div class="addr"><span class="mono">${t.token}</span><button class="copy" id="cp">copy</button><a href="${EXP}/address/${t.token}" target="_blank" rel="noopener">explorer ↗</a><a href="${EXP}/address/${t.curve}" target="_blank" rel="noopener">curve ↗</a></div>
+      ${t.description ? `<p class="muted" style="margin:.75rem 0 0;max-width:40rem;white-space:pre-wrap">${esc(t.description.replace(/\n?axon:model=\S+/, ''))}</p>` : ''}</div>
+    <div>${t.model ? `<a class="btn" href="${href('/chat')}?model=${encodeURIComponent(t.model)}">Talk to this model →</a>` : ''}</div></div>
+  <div class="grid c4" style="margin:1.5rem 0">
+    <div class="card stat"><div class="k">Price</div><div class="v">${usd(t.priceUsd)}</div></div>
+    <div class="card stat"><div class="k">Market cap</div><div class="v">${usd(t.marketCapUsd)}</div></div>
+    <div class="card stat"><div class="k">24h volume</div><div class="v">${t.trades24h ? usd(t.volume24hUsd) : 'n/a'}</div><div class="faint" style="font-size:.75rem">${t.trades24h} trades via this site</div></div>
+    <div class="card stat"><div class="k">Graduation</div><div class="v">${pct(t.graduation)}</div><span class="bar" style="width:100%"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span></div>
+  </div>
+  <div class="split">
+    <div>
+      <div class="card"><div class="eyebrow" style="margin-bottom:.6rem">Curve</div><dl class="kv">
+        ${[['ETH reserve', cs.ethReserve, 'eth'], ['Raised', cs.totalRaised, 'eth'], ['Graduation threshold', cs.graduationThreshold, 'eth'], ['Curve ETH balance', cs.balanceWei, 'eth'], ['Token reserve', cs.tokenReserve, 'tok'], ['Total supply', t.totalSupply, 'tok'], ['Creator tax', (t.creatorTaxBps != null ? t.creatorTaxBps / 100 + '%' : '2%'), 'raw'], ['Pool fee', t.poolFee != null ? (t.poolFee / 1e4) + '%' : 'n/a', 'raw']].filter(([, v]) => v != null).map(([k, v, kind]) => `<dt>${k}</dt><dd>${kind === 'eth' ? fmtEth(v, 5) + ' ETH' : kind === 'tok' ? (Number(BigInt(v)) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 }) : esc(v)}</dd>`).join('')}
+      </dl><p class="faint" style="font-size:.75rem;margin:.75rem 0 0">Price is a spot quote for a 0.001 ETH buy, read live from the curve. Volume counts trades made through this site only.</p></div>
+      <div class="tabs" style="margin-top:1.25rem" id="tabs"><button class="active" data-t="feed">Feed</button><button data-t="takes">Takes</button><button data-t="bets">Calls</button></div>
+      <div id="tabbody" class="feed"></div>
+    </div>
+    <div id="trade"></div>
+  </div>`;
+  document.getElementById('cp').onclick = () => navigator.clipboard.writeText(t.token).then(() => toast('Address copied.'));
+  const tabs = { feed: list(t.events || []), takes: list((t.takes || []).map(k => ({ ...k, type: 'take' }))), bets: list((t.bets || []).slice().reverse().map(b => ({ ...b, type: 'bet' }))) };
+  const tb = document.getElementById('tabbody'); tb.innerHTML = tabs.feed;
+  document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; for (const x of e.currentTarget.children) x.classList.toggle('active', x === b); tb.innerHTML = tabs[b.dataset.t]; };
+  // trade widget
+  const tr = document.getElementById('trade');
+  if (grad) { tr.innerHTML = `<div class="card"><div class="eyebrow">Trade</div><div class="notice" style="margin-top:.6rem">This token graduated. Trade it in the pool. <a href="${EXP}/address/${t.token}" target="_blank" rel="noopener">View on explorer ↗</a></div></div>`; return; }
+  let side = 'buy'; let q = null;
+  const render = () => { tr.innerHTML = `<div class="card"><div class="eyebrow" style="margin-bottom:.6rem">Trade $${esc(t.symbol || '?')}</div><div class="seg"><button class="${side === 'buy' ? 'on' : ''}" data-s="buy">Buy</button><button class="${side === 'sell' ? 'on' : ''}" data-s="sell">Sell</button></div>
+    <label class="field"><span>${side === 'buy' ? 'ETH to spend' : 'Tokens to sell'}</span><input id="amt" inputmode="decimal" placeholder="0.00"><span class="hint">2% creator tax goes to the compute pool in ETH. Plus the pons base fee.</span></label>
+    <button class="btn wide" id="getq">Get quote</button><div id="qres" style="margin-top:.75rem"></div></div>`;
+    tr.querySelector('.seg').onclick = e => { const b = e.target.closest('button'); if (b) { side = b.dataset.s; q = null; render(); } };
+    tr.querySelector('#getq').onclick = async () => { const btn = tr.querySelector('#getq'); btn.disabled = true; const out = tr.querySelector('#qres');
+      try { await ensureChain(); const wei = toWei(tr.querySelector('#amt').value); q = await api(`quote?token=${t.token}&side=${side}&amount=${wei}&sender=${state.address}`);
+        out.innerHTML = `<div class="notice ${q.requiresApproval ? '' : 'ok'}">${q.requiresApproval ? 'Approval required. Approve only this amount, then quote again.' : `Quoted output: <b>${esc(side === 'buy' ? (Number(BigInt(q.amountOutWei)) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' ' + (t.symbol || '') : fmtEth(q.amountOutWei, 6) + ' ETH')}</b>. Read-only simulation, refresh before confirming.`}</div>
+          <label class="field" style="margin-top:.75rem"><span>Slippage tolerance, %</span><input id="slip" type="number" min="0.1" max="10" step="0.1" value="1"></label><button class="btn wide accent" id="send">Review in wallet ↗</button>`;
+        out.querySelector('#send').onclick = async () => { const s = out.querySelector('#send'); s.disabled = true;
+          try { const bps = Math.round(Number(out.querySelector('#slip').value) * 100); if (!(bps >= 10 && bps <= 1000)) throw Error('Use slippage between 0.1% and 10%.');
+            const prep = await api('trade/prepare', { token: t.token, side, amountWei: q.amountInWei, sender: state.address, slippageBps: bps });
+            if (prep.approval) { await sendTx(prep.approval, t.token); toast('Approval confirmed. Quote again to sell.'); q = null; render(); return; }
+            const { hash } = await sendTx(prep.tx, t.curve);
+            await api('trade/record', { token: t.token, side, ethWei: side === 'buy' ? q.amountInWei : q.amountOutWei, tx: hash }).catch(() => {});
+            toast('Trade confirmed on-chain.'); setTimeout(() => location.reload(), 1200);
+          } catch (e) { toast(e.message); s.disabled = false; } };
+      } catch (e) { out.innerHTML = `<div class="notice error">${esc(e.message)}</div>`; } finally { btn.disabled = false; } };
+  };
+  render();
+});
+</script></body></html>

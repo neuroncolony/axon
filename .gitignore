@@ -1,0 +1,8 @@
+recon/
+output/
+tests/
+data/*.json
+data/*.jsonl
+data/*.tmp
+__pycache__/
+*.pyc

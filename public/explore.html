@@ -1,0 +1,52 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Markets</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="static/styles.css"><script src="static/shell.js" defer></script></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap">
+<section class="section">
+  <div class="section-head"><div><div class="eyebrow">Markets</div><h2>Every launch, priced live.</h2></div><a href="leaderboard">Leaderboards →</a></div>
+  <div class="tabs" id="sorts">
+    <button data-sort="new" class="active">New</button>
+    <button data-sort="mcap">Market cap</button>
+    <button data-sort="volume">Volume</button>
+    <button data-sort="graduation">Graduation</button>
+  </div>
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem">
+    <select id="f-model" style="padding:.5rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface)"><option value="">All models</option></select>
+    <select id="f-status" style="padding:.5rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--surface)"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
+  </div>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Token</th><th>Backs</th><th class="num">Price</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="faint">Reading the chain…</td></tr></tbody></table></div>
+</section>
+</div></main>
+<footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, ago, pct, href, short } = AXON;
+  const usd = v => v == null ? 'n/a' : fmtUsd(v);
+  let sort = 'new', model = '', status = '';
+  api('models').then(({ models }) => {
+    const sel = document.getElementById('f-model');
+    for (const m of models) { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o); }
+  }).catch(() => {});
+  function load() {
+    const q = new URLSearchParams({ sort, limit: '50' });
+    if (model) q.set('model', model);
+    if (status) q.set('status', status);
+    api('tokens?' + q).then(({ tokens }) => {
+      const tb = document.getElementById('rows');
+      if (!tokens.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing here. A token address is the only identifier that cannot be copied.</div></td></tr>`; return; }
+      tb.innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || 'n/a')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : 'n/a'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${esc(t.status)}</span></td></tr>`).join('');
+    }).catch(e => { document.getElementById('rows').innerHTML = `<tr><td colspan="8" class="down">${esc(e.message)}</td></tr>`; });
+  }
+  document.getElementById('sorts').addEventListener('click', e => {
+    const b = e.target.closest('button[data-sort]'); if (!b) return;
+    sort = b.dataset.sort;
+    for (const x of document.querySelectorAll('#sorts button')) x.classList.toggle('active', x === b);
+    load();
+  });
+  document.getElementById('f-model').addEventListener('change', e => { model = e.target.value; load(); });
+  document.getElementById('f-status').addEventListener('change', e => { status = e.target.value; load(); });
+  load();
+  setInterval(load, 30000);
+});
+</script></body></html>

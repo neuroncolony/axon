@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}}</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="static/styles.css"><script src="static/shell.js" defer></script></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap">
+<section class="hero">
+  <div>
+    <div class="eyebrow">Tokens that fund a model</div>
+    <h1 style="margin-top:.6rem">Tokens<br>with <em>a spend.</em></h1>
+    <p class="lede">{{DESCRIPTION}}</p>
+    <div class="actions"><a class="btn" id="cta-launch" href="launch">Launch a token →</a><a class="btn ghost" href="explore">See the markets</a></div>
+    <div class="chip mint" style="margin-top:1.25rem">trade · 2% → compute pool</div>
+  </div>
+  <div>
+    <div class="eyebrow" style="margin-bottom:.6rem">Back a model</div>
+    <div class="models" id="roster"><div class="model skeleton">loading</div><div class="model skeleton">loading</div><div class="model skeleton">loading</div><div class="model skeleton">loading</div></div>
+    <div class="grid c4" style="margin-top:1rem" id="stats">
+      <div class="card stat"><div class="k">Compute raised</div><div class="v" data-k="raisedUsd">·</div></div>
+      <div class="card stat"><div class="k">Available</div><div class="v" data-k="availableUsd">·</div></div>
+      <div class="card stat"><div class="k">Spent on inference</div><div class="v" data-k="spentUsd">·</div></div>
+      <div class="card stat"><div class="k">Launches</div><div class="v" data-k="launches">·</div></div>
+    </div>
+  </div>
+</section>
+<section class="section">
+  <div class="section-head"><div><div class="eyebrow">Markets</div><h2>Latest launches</h2></div><span><a href="leaderboard">Leaderboards</a> &nbsp; <a href="explore">All markets →</a></span></div>
+  <div class="table-wrap"><table class="table"><thead><tr><th>Token</th><th>Backs</th><th class="num">Price</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="faint">Reading the chain…</td></tr></tbody></table></div>
+</section>
+<section class="section">
+  <div class="section-head"><div><div class="eyebrow">Live</div><h2>Happening now</h2></div><a href="live">Full feed →</a></div>
+  <div class="feed" id="feed"></div>
+</section>
+<section class="section">
+  <div class="section-head"><div><div class="eyebrow">How it works</div><h2>Every trade pays two percent. That two percent buys thinking.</h2></div><a href="docs">Read the docs →</a></div>
+  <div class="grid c4">
+    <div class="card"><div class="eyebrow">1 · Launch</div><p>Name it, pick the model it backs, pay the pons launch fee. The whole supply goes to a bonding curve.</p></div>
+    <div class="card"><div class="eyebrow">2 · Trade</div><p>Every buy and sell pays a 2% creator tax into the platform treasury, in ETH, never in the token.</p></div>
+    <div class="card"><div class="eyebrow">3 · Sweep</div><p>A keeper claims each curve's escrow to the treasury. That step is off-chain and its wallet is public.</p></div>
+    <div class="card"><div class="eyebrow">4 · Spend</div><p>Launch a token and talk to any backed model. Each reply is billed to the pool by the token at list price.</p></div>
+  </div>
+</section>
+</div></main>
+<footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, ago, pct, href, short } = AXON;
+  const usd = v => v == null ? '·' : fmtUsd(v);
+  api('models').then(({ models, usage }) => {
+    const top = models.slice(0, 6);
+    document.getElementById('roster').innerHTML = top.map(m => `<a class="model" href="${href('/launch')}?model=${encodeURIComponent(m.id)}"><span><span class="n">${esc(m.name)}</span><br><span class="p">${esc(m.provider)}</span></span><span class="chip">${usage.launches[m.id] || 0}</span></a>`).join('');
+  }).catch(() => {});
+  api('stats').then(s => { for (const el of document.querySelectorAll('[data-k]')) { const k = el.dataset.k; el.textContent = k === 'launches' ? s.launches : usd(s[k]); } }).catch(() => {});
+  api('tokens?sort=new&limit=10').then(({ tokens }) => {
+    const tb = document.getElementById('rows');
+    if (!tokens.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing launched yet. A token address is the only identifier that cannot be copied. <a href="${href('/launch')}">Be first →</a></div></td></tr>`; return; }
+    tb.innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || '·')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : '·'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${t.status}</span></td></tr>`).join('');
+  }).catch(e => { document.getElementById('rows').innerHTML = `<tr><td colspan="8" class="down">${esc(e.message)}</td></tr>`; });
+  api('live?limit=6').then(({ events }) => {
+    const f = document.getElementById('feed');
+    if (!events.length) { f.innerHTML = '<div class="empty">Quiet. Launches, trades, takes and calls show up here as they happen.</div>'; return; }
+    f.innerHTML = events.map(e => `<div class="feed-item"><div class="t">${ago(e.at)}</div><div><div class="who"><b><a href="${href('/token/' + e.token)}">$${esc(e.symbol || short(e.token))}</a></b>${e.model ? `<span class="chip">${esc(e.model.split('/')[1])}</span>` : ''}<span>${e.type === 'take' ? 'said' : e.type === 'bet' ? (e.result ? `call ${e.call}: ${e.result}` : `calls ${e.call} for 24h`) : e.type === 'trade' ? `${e.side} · ${Number(e.ethValue).toFixed(4)} ETH` : 'launched'}</span></div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`).join('');
+  }).catch(() => {});
+});
+</script></body></html>

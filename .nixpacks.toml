@@ -1,0 +1,4 @@
+[phases.setup]
+nixPkgs = ["python311"]
+[start]
+cmd = "python3 server/server.py"

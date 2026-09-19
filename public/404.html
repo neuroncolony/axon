@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Not found</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="/static/styles.css"><script src="/static/shell.js" defer></script></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap" style="max-width:32rem;text-align:center"><div class="card"><div class="eyebrow">404</div><h2 style="font-size:1.5rem;margin:.5rem 0">This page does not exist.</h2><p class="muted" id="p">Check the address, or start from the markets.</p><div style="display:flex;gap:.5rem;justify-content:center;margin-top:1rem"><a class="btn" id="h" href="/">Home</a><a class="btn ghost" id="x" href="/explore">Markets</a></div></div></div></main>
+<footer class="footer" id="footer"></footer>
+<script>document.addEventListener('DOMContentLoaded', () => { document.getElementById('h').href = AXON.href('/'); document.getElementById('x').href = AXON.href('/explore'); });</script></body></html>
