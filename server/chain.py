@@ -146,10 +146,8 @@ def launch_logs(from_block, to_block='latest'):
     out = []
     for l in logs:
         t = l['topics']
-        d = l.get('data') or '0x'
-        rec = to_checksum_address('0x' + d[2:66][-40:]) if len(d) >= 66 else None
         out.append({'token':to_checksum_address('0x'+t[1][-40:]),'curve':to_checksum_address('0x'+t[2][-40:]),'deployer':to_checksum_address('0x'+t[3][-40:]),
-                    'creatorFeeRecipient':rec,'block':int(l['blockNumber'],16),'tx':l['transactionHash']})
+                    'block':int(l['blockNumber'],16),'tx':l['transactionHash']})
     return out
 
 def receipt(txhash):

@@ -73,7 +73,6 @@ def refresh(force=False):
             except Exception: logs = []
             for l in logs:
                 if l['token'].lower() in TOKENS: continue
-                if l.get('creatorFeeRecipient') and l['creatorFeeRecipient'].lower() != (chain.treasury() or '').lower(): continue
                 try:
                     snap = chain.token_snapshot(l['token'])
                     if not snap['fundedByAxon']: continue
