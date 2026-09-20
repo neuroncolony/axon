@@ -92,9 +92,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     c.save();
     c.fillStyle = 'rgba(255,255,255,.94)'; c.beginPath(); c.arc(cx, cy, R * 1.12, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#0b1a33';
-    const E = [[50,19.5,14.4,6.6,0],[21.9,36.2,14.1,6.3,-59],[78.1,36.2,14.1,6.3,59],[21.9,63.7,14.1,6.3,59],[78.1,63.7,14.1,6.3,-59],[50,80.2,14.4,6.6,0]];
+    const E = [[50,7.9,17.8,7.9,0],[85.8,29.3,17.8,7.9,60],[85.7,71.7,17.8,7.9,120],[50,92.4,17.8,7.9,0],[14.4,71.6,17.8,7.9,60],[14.5,29.3,17.8,7.9,120]];
     const k = b / 100;
-    for (const [ex, ey, rx, ry, rot] of E) { c.beginPath(); c.ellipse(cx - b / 2 + ex * k, cy - b / 2 + ey * k, rx * k * 0.86, ry * k * 0.86, rot * Math.PI / 180, 0, Math.PI * 2); c.fill(); }
+    for (const [ex, ey, rx, ry, rot] of E) { c.beginPath(); c.ellipse(cx - b / 2 + ex * k, cy - b / 2 + ey * k, rx * k * 0.78, ry * k * 0.78, rot * Math.PI / 180, 0, Math.PI * 2); c.fill(); }
     c.restore();
   }
   function openCropper(img, prev) {
