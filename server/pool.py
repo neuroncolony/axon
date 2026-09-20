@@ -46,6 +46,19 @@ def register_launch(txhash, model, logo, description):
     store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': rec['model'], 'by': rec['deployer'], 'tx': txhash, 'at': store.now()})
     return {'ok': True, 'token': rec}
 
+def _purge_foreign():
+    """Only tokens whose creatorFeeRecipient is our treasury belong on this site. Drop anything else, including records adopted before the treasury was set."""
+    t = (chain.treasury() or '').lower()
+    if not t: return 0
+    gone = 0
+    for k, rec in list(TOKENS.items()):
+        r = rec.get('creatorFeeRecipient')
+        if r is None:
+            try: r = chain.launched(rec['token'])['creatorFeeRecipient']; rec['creatorFeeRecipient'] = r
+            except Exception: continue
+        if r.lower() != t: TOKENS.pop(k, None); gone += 1
+    if gone: store.save('tokens')
+    return gone
 _ix = {'lastBlock': None, 'at': 0, 'lock': threading.Lock()}
 def refresh(force=False):
     """Sweep recent TokenLaunched logs, adopt tokens whose creatorFeeRecipient is our treasury, re-read curve state for known tokens."""
@@ -59,13 +72,16 @@ def refresh(force=False):
             except Exception: logs = []
             for l in logs:
                 if l['token'].lower() in TOKENS: continue
+                if l.get('creatorFeeRecipient') and l['creatorFeeRecipient'].lower() != (chain.treasury() or '').lower(): continue
                 try:
                     snap = chain.token_snapshot(l['token'])
+                    if not snap['fundedByAxon']: continue
                     if adopted < 200:
-                        rec = _record(snap, None, '', '', l['tx'], l['block']); rec['native'] = bool(snap['fundedByAxon']); TOKENS[rec['token'].lower()] = rec; adopted += 1
+                        rec = _record(snap, None, '', '', l['tx'], l['block']); rec['native'] = True; rec['creatorFeeRecipient'] = snap['creatorFeeRecipient']; TOKENS[rec['token'].lower()] = rec; adopted += 1
                         store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
                 except Exception: pass
         _ix['lastBlock'] = head; _ix['at'] = time.time()
+        _purge_foreign()
         for rec in sorted(TOKENS.values(), key=lambda r: r.get('updatedAt', 0))[:12]:
             try:
                 snap = chain.token_snapshot(rec['token'])
