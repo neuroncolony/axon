@@ -359,3 +359,5 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .cap.is-blur{filter:blur(1.6px);opacity:.78;z-index:0}
 .cap.is-blur:hover{filter:blur(0);opacity:1;z-index:2}
 @media(prefers-reduced-motion:reduce){.cap{transition:none}}
+
+.devbuy{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.devbuy .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--wash);color:var(--ink);font:500 .85rem var(--font-head);cursor:pointer;transition:background .25s var(--ease),color .25s var(--ease)}.devbuy .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}.devbuy input{width:140px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);font-size:.85rem}

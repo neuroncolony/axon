@@ -31,6 +31,8 @@
     <div>
       <div class="card">
         <div class="eyebrow">What happens</div>
+        <label class="field"><span>Dev buy <span class="hint">optional. A second wallet prompt buys on the curve right after the launch confirms, so you hold supply before anyone else can.</span></span>
+          <div class="devbuy" id="devbuy"><button type="button" class="chip on" data-eth="0">none</button><button type="button" class="chip" data-eth="0.001">0.001</button><button type="button" class="chip" data-eth="0.005">0.005</button><button type="button" class="chip" data-eth="0.01">0.01</button><button type="button" class="chip" data-eth="0.05">0.05</button><input id="f-devbuy" class="mono" type="number" min="0" step="0.0001" placeholder="custom ETH" inputmode="decimal"></div></label>
         <ul class="prose" style="margin:.75rem 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:8px;font-size:.875rem">
           <li>Launch fee: <b id="w-fee">…</b>, paid to the pons v2 factory. <span class="hint">Do not send ETH directly to the factory or treasury. The 0.0005 ETH fee rides on the launch transaction your wallet signs here; a bare transfer is lost.</span></li>
           <li>A 2% creator tax on every curve trade goes to the treasury <span id="w-treasury">…</span>.</li>
@@ -83,6 +85,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('lp-edit').onclick = () => { if (logo.raw) openCropper(logo.raw, logo.edit); };
   document.getElementById('lp-remove').onclick = () => { logo.ownData = null; logo.ownUrl = null; logo.raw = null; logo.edit = null; logo.src = 'model'; paintLogo(); };
   document.getElementById('f-model').addEventListener('change', paintLogo);
+  const devIn = document.getElementById('f-devbuy'), devBox = document.getElementById('devbuy');
+  devBox.addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; devBox.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === b)); devIn.value = b.dataset.eth === '0' ? '' : b.dataset.eth; });
+  devIn.addEventListener('input', () => devBox.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x.dataset.eth === '0' && !devIn.value)));
+  function devBuyWei() { const v = parseFloat(devIn.value || '0'); if (!(v > 0)) return 0n; if (v > 5) throw new Error('Dev buy is capped at 5 ETH.'); return BigInt(Math.round(v * 1e6)) * 10n ** 12n; }
 
   /* cropper: pan (drag), zoom (wheel, pinch, slider), rotate (90 steps + fine), flip, fit, fill, reset. Exports 512 px PNG. */
 
@@ -175,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       let logoUrl = provUrl(modelsById[model]?.provider);
       if (logo.src === 'own') { if (!logo.ownUrl) { submit.textContent = 'Uploading logo…'; const up = await api('logo/upload', { data: logo.ownData }); logo.ownUrl = up.url; } logoUrl = logo.ownUrl; }
       submit.textContent = 'Confirm in wallet…';
+      devBuyWei();
       const prep = await api('launch/prepare', { name, symbol, description, logo: logoUrl, model, website, twitter, telegram });
       const { hash } = await sendTx(prep.tx, prep.tx.to);
       let done = null;
@@ -186,7 +193,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
       const addr = done && done.token ? done.token.token : null;
-      notice.innerHTML = `<div class="notice ok">Launched. <a href="${href('/token/' + addr)}">Open the token page →</a> <a class="btn sm" style="margin-left:.5rem" href="${href('/chat')}">Open chat</a></div>`;
+      let bought = '';
+      const dev = devBuyWei();
+      if (dev > 0n && addr) {
+        try {
+          submit.textContent = 'Dev buy, confirm in wallet…';
+          const t = await api('trade/prepare', { token: addr, side: 'buy', amountWei: dev.toString(), sender: state.address, slippageBps: 300 });
+          const b = await sendTx(t.tx, t.tx.to);
+          try { await api('trade/record', { tx: b.hash, token: addr }); } catch {}
+          bought = ` Dev buy of ${devIn.value} ETH sent (<a href="https://robinhoodchain.blockscout.com/tx/${b.hash}" target="_blank" rel="noopener">tx</a>).`;
+        } catch (e) { bought = ` <span class="warn">Token is live but the dev buy did not go through: ${e.message}. You can buy on the token page.</span>`; }
+      }
+      notice.innerHTML = `<div class="notice ok">Launched.${bought} <a href="${href('/token/' + addr)}">Open the token page →</a> <a class="btn sm" style="margin-left:.5rem" href="${href('/chat')}">Open chat</a></div>`;
       toast('Token launched.');
     } catch (err) { showErr(err.message); }
     submit.disabled = false; submit.textContent = 'Launch token';
