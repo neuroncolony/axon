@@ -130,6 +130,15 @@ window.AXON = (() => {
       document.addEventListener('keydown', e => { if (e.key === 'Escape') navm.classList.remove('open'); });
       addEventListener('resize', () => { if (navm.classList.contains('open')) place(); }, { passive: true });
     }
+    if (!document.querySelector('.sky-bg')) {
+      const sky = document.createElement('div');
+      sky.className = 'sky-bg';
+      sky.innerHTML = '<video muted loop playsinline autoplay preload="auto" src="/static/assets/sky-bg.mp4"></video>';
+      document.body.prepend(sky);
+      const v = sky.firstElementChild;
+      v.addEventListener('canplay', () => v.classList.add('on'), { once: true });
+      v.play().catch(() => {});
+    }
     document.querySelectorAll('.btn.cta .mark:empty').forEach(m => m.innerHTML = MARK);
     const f = $('#footer'); if (f) f.innerHTML = `<div class="wrap"><div class="fgrid"><div><a class="brand" href="${href('/')}"><span class="mark">${MARK}</span>${BRAND.name}</a><p class="ftxt">Every trade fires a thought. Tokens on pons v2, Robinhood Chain. Inference through OpenRouter.</p></div><div><p class="eyebrow">Product</p><div class="flinks"><a href="${href('/launch')}">Launch a coin</a><a href="${href('/explore')}">Markets</a><a href="${href('/live')}">Live</a><a href="${href('/explore')}?view=compare">Compare</a><a href="${href('/leaderboard')}">Leaderboards</a></div></div><div><p class="eyebrow">Under the hood</p><div class="flinks"><a href="${href('/docs')}">Notes</a><a href="${href('/takes')}">Agora</a><a href="${href('/offspring')}">Offspring</a><a href="${CHAIN.explorer}" target="_blank" rel="noopener">Explorer</a></div></div></div><div class="fbottom"><span>&copy; ${new Date().getFullYear()} ${BRAND.display}. Runs on chain ${CHAIN.id}. Tokens are experiments, not investments.</span><span class="mono">MIT licensed · <a href="https://github.com/neuroncolony/axon/blob/main/LICENSE" target="_blank" rel="noopener">License</a> · pons v2 · Robinhood Chain</span></div></div>`;
   }
