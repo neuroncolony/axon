@@ -50,7 +50,8 @@ def register_launch(txhash, model, logo, description, socials=None):
     rec = _record(snap, model if model in M.BY_ID else None, logo, description, txhash, found['block'])
     so = socials or {}; rec['socials'] = {k: str(so.get(k, ''))[:200] for k in ('website', 'x', 'telegram')}
     TOKENS[rec['token'].lower()] = rec; store.save('tokens')
-    store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': rec['model'], 'by': rec['deployer'], 'tx': txhash, 'at': store.now()})
+    if not _has_launch_event(rec['token']):
+        store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': rec['model'], 'by': rec['deployer'], 'tx': txhash, 'at': store.now()})
     return {'ok': True, 'token': rec}
 
 def _purge_foreign():
@@ -108,7 +109,8 @@ def refresh(force=False):
                     if not snap['fundedByAxon']: continue
                     if adopted < 200:
                         rec = _record(snap, None, '', '', l['tx'], l['block']); rec['native'] = True; rec['creatorFeeRecipient'] = snap['creatorFeeRecipient']; TOKENS[rec['token'].lower()] = rec; adopted += 1
-                        store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
+                        if not _has_launch_event(rec['token']):
+                            store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
                 except Exception: pass
         _ix['lastBlock'] = head; _ix['at'] = time.time()
         _purge_foreign()
@@ -190,7 +192,21 @@ def token_detail(addr):
             'feesAccrued': holders.fees_accrued(rec, TRADES.get(rec['token'].lower(), []), eth_usd()), 'socials': rec.get('socials') or {'website': '', 'x': '', 'telegram': ''},
             'persona': personas.get_persona(rec['token'], rec)}
 
-def events(limit=400): return store.read_jsonl('events', limit)
+def _has_launch_event(token):
+    t = (token or '').lower()
+    return any(r.get('type') == 'launch' and (r.get('token') or '').lower() == t for r in store.read_jsonl('events', 2000))
+
+def events(limit=400):
+    rows = store.read_jsonl('events', limit)
+    # one launch row per token: re-indexing after a data reset used to append a second one
+    seen, out = set(), []
+    for r in rows:
+        if r.get('type') == 'launch':
+            k = (r.get('token') or '').lower()
+            if k in seen: continue
+            seen.add(k)
+        out.append(r)
+    return out
 def volume24(token):
     cut = store.now() - 86400
     return sum(int(r.get('ethWei', 0)) / 1e18 for r in TRADES.get(token.lower(), []) if r.get('at', 0) > cut)
