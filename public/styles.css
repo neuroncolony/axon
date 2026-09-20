@@ -97,11 +97,11 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .cap.teal{background:linear-gradient(180deg,#cdeef0,#9fd4dd)}
 .cap.pink{background:linear-gradient(180deg,#fbd9e6,#f0aec6)}
 .cap-1{top:4%;--tilt:-14deg;--dur:6.4s}
-.cap-2{top:29%;--tilt:9deg;--dur:8.6s;--dx:52px;filter:blur(1.2px);z-index:0}
+.cap-2{top:29%;--tilt:9deg;--dur:8.6s;--dx:52px}
 .cap-3{top:54%;--tilt:-6deg;--dur:7.4s;--dx:14px}
 .cap-4{top:79%;--tilt:11deg;--dur:8s;--dx:64px}
 .cap-5{top:3%;--tilt:12deg;--dur:7s}
-.cap-6{top:28%;--tilt:-9deg;--dur:9s;--dx:48px;filter:blur(1.2px);z-index:0}
+.cap-6{top:28%;--tilt:-9deg;--dur:9s;--dx:48px}
 .cap-7{top:53%;--tilt:6deg;--dur:6.8s;--dx:10px}
 .cap-8{top:78%;--tilt:-11deg;--dur:7.8s;--dx:60px}
 /* feature strip */
@@ -340,3 +340,9 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 ::-webkit-scrollbar-corner{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:999px;border:3px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:var(--muted-2);background-clip:content-box}
+
+/* background capsules: blur wanders between them, hover clears it */
+.cap{transition:filter 1.1s var(--ease),opacity 1.1s var(--ease),box-shadow .3s var(--ease),color .3s var(--ease)}
+.cap.is-blur{filter:blur(1.6px);opacity:.78;z-index:0}
+.cap.is-blur:hover{filter:blur(0);opacity:1;z-index:2}
+@media(prefers-reduced-motion:reduce){.cap{transition:none}}

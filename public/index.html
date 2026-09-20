@@ -60,6 +60,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   const usd = v => v == null ? '·' : fmtUsd(v);
   const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
   const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
+
+  // blur wanders across the background capsules; hovering a blurred one clears it
+  (function(){
+    const caps=[...document.querySelectorAll('.hero-caps .cap')]; if(!caps.length) return;
+    let hovered=new Set();
+    caps.forEach(c=>{c.addEventListener('pointerenter',()=>{hovered.add(c);c.classList.remove('is-blur')});c.addEventListener('pointerleave',()=>hovered.delete(c))});
+    let i=0;
+    function step(){
+      const vis=caps.filter(c=>getComputedStyle(c).display!=='none'); if(vis.length<3) return;
+      caps.forEach(c=>c.classList.remove('is-blur'));
+      const a=vis[i%vis.length], b=vis[(i+Math.floor(vis.length/2))%vis.length];
+      [a,b].forEach(c=>{ if(!hovered.has(c)) c.classList.add('is-blur'); });
+      i++;
+    }
+    step(); setInterval(step,3200);
+  })();
   // capsules are static links to the launcher with model preselected
   api('tokens?sort=new&limit=10').then(({ tokens }) => {
     const tb = document.getElementById('rows');
