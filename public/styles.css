@@ -274,13 +274,14 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .logo-pick{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
 .lp-tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 12px 14px;border:0;border-radius:16px;background:var(--wash-1);box-shadow:0 0 0 1px var(--line);cursor:pointer;font:inherit;color:var(--ink);transition:box-shadow .4s var(--ease),background .4s var(--ease),transform .4s var(--ease)}
 .lp-tile:hover{background:#fff;transform:translateY(-1px)}.lp-tile.active{background:#fff;box-shadow:0 0 0 2px var(--blue-ring)}
-.lp-tile img,.lp-frame{width:72px;height:72px;border-radius:50%;object-fit:cover;background:var(--wash);display:grid;place-items:center;overflow:hidden}
+.lp-tile img,.lp-frame{width:72px;height:72px;border-radius:18px;object-fit:cover;background:var(--wash);display:grid;place-items:center;overflow:hidden}
 .lp-frame img{width:100%;height:100%;border-radius:0}.lp-plus{font-family:var(--head);font-size:30px;font-weight:300;color:var(--muted);line-height:1}
 .lp-name{font-family:var(--head);font-size:16px;font-weight:500}.lp-sub{font-size:12px;color:var(--muted)}
 .lp-actions{display:flex;gap:8px;margin-top:8px}
 .cropper{width:min(420px,100%)}.crop-stage{position:relative;width:320px;height:320px;margin:0 auto;border-radius:16px;overflow:hidden;background:var(--wash);cursor:grab;touch-action:none;user-select:none}
 .crop-stage:active{cursor:grabbing}.crop-stage canvas{display:block}
-.crop-mask{position:absolute;inset:0;pointer-events:none;border-radius:16px;box-shadow:inset 0 0 0 1px var(--line);background:radial-gradient(circle at center,transparent 49.5%,rgba(11,26,51,.28) 50.5%)}
+.crop-mask{position:absolute;inset:0;pointer-events:none;border-radius:16px;box-shadow:inset 0 0 0 1px var(--line);background:transparent}
+.crop-mask::after{content:'';position:absolute;inset:0;border-radius:16px;box-shadow:inset 0 0 0 1px rgba(11,26,51,.14)}
 .crop-row{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:13px;color:var(--muted)}.crop-row .lbl{width:48px}.crop-row .mono{width:44px;text-align:right}
 .crop-row input[type=range]{flex:1;accent-color:var(--blue);height:24px}
 .crop-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}.crop-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
