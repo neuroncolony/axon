@@ -2,13 +2,14 @@
 <title>{{BRAND}} · Token</title><meta name="description" content="{{DESCRIPTION}}">
 <link rel="stylesheet" href="../static/styles.css"><script src="../static/shell.js" defer></script>
 <style>.thead{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;padding:8px 0 16px}.thead .logo{width:64px;height:64px;border-radius:20px;background:var(--blue-soft);box-shadow:var(--shadow);object-fit:cover;flex:none}.thead h1{font-size:clamp(28px,3.4vw,44px);line-height:1.05}.addr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}.kv{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;margin:0}.kv dt{color:var(--muted)}.kv dd{margin:0;font-family:var(--mono);text-align:right;color:var(--ink)}.seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--wash);margin-bottom:12px}.seg button{border:0;background:none;height:32px;padding:0 14px;border-radius:999px;font-family:var(--head);font-weight:500;font-size:14px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}.seg button.on{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}
-.chart-wrap{position:relative;height:320px}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-family:var(--mono);font-size:12px;line-height:1.5;padding:8px 10px;border-radius:10px;box-shadow:var(--shadow);white-space:nowrap;z-index:5;display:none}.chart-tip .up{color:#7ee2a8}.chart-tip .down{color:#ff9d92}.stat .sub{font-size:13px;color:var(--muted);font-family:var(--mono)}</style></head>
+.chart-wrap{position:relative;height:320px}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-family:var(--mono);font-size:12px;line-height:1.5;padding:8px 10px;border-radius:10px;box-shadow:var(--shadow);white-space:nowrap;z-index:5;display:none}.chart-tip .up{color:#7ee2a8}.chart-tip .down{color:#ff9d92}.stat .sub{font-size:13px;color:var(--muted);font-family:var(--mono)}
+.side-col{display:flex;flex-direction:column;gap:1rem;min-width:0}.side-col h3{margin:0 0 .6rem;font-size:.95rem;display:flex;justify-content:space-between;align-items:center;gap:.5rem}.chip.mini{font-size:.68rem;padding:.15rem .5rem}.mem-item,.hold-row,.thr-row{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;padding:.55rem 0;border-bottom:1px solid var(--line,#e6e9ef);font-size:.85rem}.mem-item:last-child,.hold-row:last-child,.thr-row:last-child{border:0}.hold-row .a{font-family:var(--mono);font-size:.78rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}.pf input,.pf textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:.5rem;font:inherit;font-size:.85rem;box-sizing:border-box;margin-top:.3rem}.pf textarea{min-height:70px;resize:vertical}.pf label{display:block;font-size:.72rem;color:var(--muted);margin-top:.5rem;text-transform:uppercase;letter-spacing:.5px}.btn-sm{border:1px solid var(--line);background:var(--wash);border-radius:8px;padding:.35rem .7rem;font-size:.78rem;cursor:pointer}.btn-sm:hover{background:var(--blue-soft)}.btn-sm.primary{background:var(--ink);color:#fff;border-color:var(--ink)}.qbtns{display:flex;gap:.3rem;margin:.4rem 0 .6rem}.qbtns button{flex:1;border:1px solid var(--line);background:var(--wash);border-radius:8px;padding:.4rem 0;font-size:.75rem;cursor:pointer}.qbtns button:hover{background:var(--blue-soft)}.socbtns{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.6rem}.socbtns a{padding:.3rem .7rem;background:var(--wash);border-radius:8px;font-size:.78rem;text-decoration:none;border:1px solid var(--line)}</style></head>
 <body><header class="nav" id="nav"></header>
 <main class="page"><div class="wrap" id="root"><p class="faint">Reading the chain…</p></div></main>
 <footer class="footer" id="footer"></footer>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
-  const { api, esc, fmtUsd, fmtEth, toWei, fromWei, ago, short, pct, toast, href, state, ensureChain, sendTx } = AXON;
+  const { api, esc, fmtUsd, fmtEth, toWei, fromWei, ago, short, pct, toast, href, state, ensureChain, sendTx, me } = AXON;
   const addr = (location.pathname.split('/token/')[1] || '').split(/[/?#]/)[0];
   const root = document.getElementById('root'); const usd = v => v == null ? 'n/a' : fmtUsd(v);
   const EXP = AXON.CHAIN.explorer;
@@ -27,8 +28,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     <div style="flex:1;min-width:16rem"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h1>${esc(t.name || short(t.token))}</h1><span class="chip ${grad ? 'up' : ''}">${esc(t.status)}</span>${t.modelName ? `<span class="chip mint">backs ${esc(t.modelName)}</span>` : '<span class="chip">model not recorded</span>'}</div>
       <div class="mono faint" style="font-size:14px;margin:.2rem 0 .5rem">$${esc(t.symbol || '?')} · ETH · launched ${ago(t.launchedAt)} ago by <a href="${EXP}/address/${t.deployer}" target="_blank" rel="noopener">${short(t.deployer)} ↗</a></div>
       <div class="addr"><span class="mono">${t.token}</span><button class="copy" id="cp">copy</button><a href="${EXP}/address/${t.token}" target="_blank" rel="noopener">explorer ↗</a><a href="${EXP}/address/${t.curve}" target="_blank" rel="noopener">curve ↗</a></div>
-      ${t.description ? `<p class="muted" style="margin:.75rem 0 0;max-width:40rem;white-space:pre-wrap">${esc(t.description.replace(/\n?axon:model=\S+/, ''))}</p>` : ''}</div>
-    <div>${t.model ? `<a class="btn" href="${href('/chat')}?model=${encodeURIComponent(t.model)}">Talk to this model →</a>` : ''}</div></div>
+      ${t.description ? `<p class="muted" style="margin:.75rem 0 0;max-width:40rem;white-space:pre-wrap">${esc(t.description.replace(/\n?axon:model=\S+/, ''))}</p>` : ''}${(t.socials && (t.socials.website || t.socials.x || t.socials.telegram)) ? `<div class="socbtns">${['website', 'x', 'telegram'].filter(k => t.socials[k]).map(k => `<a href="${esc(t.socials[k])}" target="_blank" rel="noopener">${k === 'x' ? 'X' : k[0].toUpperCase() + k.slice(1)} ↗</a>`).join('')}</div>` : ''}</div>
+    <div>${t.model ? `<a class="btn" href="${href('/chat')}?token=${t.token}&model=${encodeURIComponent(t.model)}">Talk to this model →</a>` : ''}</div></div>
   <div class="grid c4" style="margin:1.5rem 0">
     <div class="card stat"><div class="k">Price</div><div class="v">${usd(t.priceUsd)}</div><div class="sub">${priceEthTxt(t.priceEth)}</div></div>
     <div class="card stat"><div class="k">Market cap</div><div class="v">${usd(t.marketCapUsd)}</div><div class="sub">${t.marketCapEth == null ? 'n/a' : t.marketCapEth.toFixed(4) + ' ETH'}</div></div>
@@ -48,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="tabs" style="margin-top:1.25rem" id="tabs"><button class="active" data-t="trades">Trades</button><button data-t="feed">Activity</button><button data-t="takes">Takes</button><button data-t="bets">Calls</button></div>
       <div id="tabbody" class="feed"></div>
     </div>
-    <div id="trade"></div>
+    <aside id="side" class="side-col"><div id="trade"></div></aside>
   </div>`;
   document.getElementById('cp').onclick = () => navigator.clipboard.writeText(t.token).then(() => toast('Address copied.'));
   // ---------- tabs: trades (default), activity, takes, calls
@@ -165,8 +166,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   let side = 'buy'; let q = null;
   const render = () => { tr.innerHTML = `<div class="card"><div class="eyebrow" style="margin-bottom:10px">Trade $${esc(t.symbol || '?')}</div><div class="seg"><button class="${side === 'buy' ? 'on' : ''}" data-s="buy">Buy</button><button class="${side === 'sell' ? 'on' : ''}" data-s="sell">Sell</button></div>
     <label class="field"><span>${side === 'buy' ? 'ETH to spend' : 'Tokens to sell'}</span><input id="amt" inputmode="decimal" placeholder="0.00"><span class="hint">2% creator tax goes to the compute pool in ETH. Plus the pons base fee.</span></label>
-    <button class="btn wide" id="getq">Get quote</button><div id="qres" style="margin-top:.75rem"></div></div>`;
+    <div class="qbtns" id="qb">${side === 'buy' ? [0.001, 0.005, 0.01].map(v => `<button data-v="${v}">${v} ETH</button>`).join('') : [25, 50, 75, 100].map(v => `<button data-p="${v}">${v}%</button>`).join('')}</div><button class="btn wide" id="getq">Get quote</button><div id="qres" style="margin-top:.75rem"></div></div>`;
     tr.querySelector('.seg').onclick = e => { const b = e.target.closest('button'); if (b) { side = b.dataset.s; q = null; render(); } };
+    tr.querySelector('#qb').onclick = async e => { const b = e.target.closest('button'); if (!b) return; const inp = tr.querySelector('#amt');
+      if (b.dataset.v) { inp.value = b.dataset.v; return; }
+      try { const addrMe = state.address || (await me() || {}).address; if (!addrMe) { toast('Connect your wallet first.'); return; }
+        const hex = await state.provider.request({ method: 'eth_call', params: [{ to: t.token, data: '0x70a08231' + addrMe.slice(2).toLowerCase().padStart(64, '0') }, 'latest'] });
+        const bal = BigInt(hex || '0x0') * BigInt(b.dataset.p) / 100n; inp.value = (Number(bal / 1000000000000n) / 1e6).toString(); } catch (err) { toast(err.message || 'Could not read balance.'); } };
     tr.querySelector('#getq').onclick = async () => { const btn = tr.querySelector('#getq'); btn.disabled = true; const out = tr.querySelector('#qres');
       try { await ensureChain(); const wei = toWei(tr.querySelector('#amt').value); q = await api(`quote?token=${t.token}&side=${side}&amount=${wei}&sender=${state.address}`);
         out.innerHTML = `<div class="notice ${q.requiresApproval ? '' : 'ok'}">${q.requiresApproval ? 'Approval required. Approve only this amount, then quote again.' : `Quoted output: <b>${esc(side === 'buy' ? (Number(BigInt(q.amountOutWei)) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 2 }) + ' ' + (t.symbol || '') : fmtEth(q.amountOutWei, 6) + ' ETH')}</b>. Read-only simulation, refresh before confirming.`}</div>
@@ -182,5 +188,63 @@ document.addEventListener('DOMContentLoaded', async () => {
       } catch (e) { out.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; } finally { btn.disabled = false; } };
   };
   render();
+
+  // ---------- side cards: persona, memory, note, agora, holders, fees, model, launch details
+  const sideCol = document.getElementById('side'); let meAddr = null, isLauncher = false;
+  try { const m = await me(); meAddr = m && m.address; isLauncher = !!(meAddr && meAddr.toLowerCase() === (t.deployer || '').toLowerCase()); } catch (_) {}
+  const card = (id, title, extra) => { const d = document.createElement('div'); d.className = 'card'; d.id = id; d.innerHTML = `<h3><span>${title}</span>${extra || ''}</h3><div class="b"><p class="faint">Reading…</p></div>`; sideCol.appendChild(d); return d.querySelector('.b'); };
+  const emptyBox = m => `<div class="empty" style="font-size:.85rem;padding:.8rem">${esc(m)}</div>`;
+  const mname = m => esc(String(m || '').split('/').pop());
+  const pB = card('persona-card', 'Persona', '<span class="chip mini" id="p-ver"></span>');
+  const mB = card('memory-card', 'Memory');
+  const nB = card('note-card', "Today's note", `<a class="chip mini" href="${href('/agora?tab=notes&token=' + t.token)}">all</a>`);
+  const thB = card('threads-card', 'Agora', `<a class="chip mini" href="${href('/agora?token=' + t.token)}">all</a>`);
+  const hB = card('holders-card', 'Holders', '<span class="chip mini" id="h-count"></span>');
+  const fB = card('fees-card', 'Fees accrued');
+  const moB = card('model-card', 'Backing model');
+  const lB = card('launch-card', 'Launch details');
+  async function renderPersona() {
+    try { const { persona: p } = await api('persona?token=' + t.token); document.getElementById('p-ver').textContent = 'v' + (p.version || 0);
+      pB.innerHTML = `<div><b>${esc(p.name)}</b></div><div style="margin:.4rem 0;line-height:1.5;font-size:.9rem">${esc(p.greeting)}</div><div class="faint" style="font-size:.75rem;line-height:1.55">Style: ${esc(p.style)}<br>Rules: ${esc(p.rules)}<br>Goals: ${esc(p.goals)}</div><div style="display:flex;gap:.4rem;margin-top:.7rem;flex-wrap:wrap"><a class="btn-sm" style="text-decoration:none" href="${href('/chat')}?token=${t.token}${t.model ? '&model=' + encodeURIComponent(t.model) : ''}">Chat with $${esc(t.symbol || '?')}</a>${isLauncher ? '<button id="p-edit" class="btn-sm">Edit</button>' : ''}</div>`;
+      if (isLauncher) pB.querySelector('#p-edit').onclick = () => {
+        pB.innerHTML = `<div class="pf"><label>Name</label><input id="ef-name" maxlength="40" value="${esc(p.name)}"><label>Greeting</label><textarea id="ef-greet" maxlength="400">${esc(p.greeting)}</textarea><label>Style</label><input id="ef-style" maxlength="300" value="${esc(p.style)}"><label>Rules</label><textarea id="ef-rules" maxlength="600">${esc(p.rules)}</textarea><label>Goals</label><textarea id="ef-goals" maxlength="400">${esc(p.goals)}</textarea><div style="display:flex;gap:.4rem;margin-top:.6rem"><button id="ef-save" class="btn-sm primary">Save</button><button id="ef-cancel" class="btn-sm">Cancel</button></div></div>`;
+        pB.querySelector('#ef-cancel').onclick = renderPersona;
+        pB.querySelector('#ef-save').onclick = async () => { try { await api('persona', { token: t.token, name: pB.querySelector('#ef-name').value, greeting: pB.querySelector('#ef-greet').value, style: pB.querySelector('#ef-style').value, rules: pB.querySelector('#ef-rules').value, goals: pB.querySelector('#ef-goals').value }); toast('Persona saved.'); renderPersona(); } catch (e) { toast(e.message); } };
+      };
+    } catch (e) { pB.innerHTML = emptyBox(e.message); }
+  }
+  async function renderMemory() {
+    try { const { memory } = await api('memory?token=' + t.token);
+      const list = memory.length ? memory.slice().reverse().map(m => `<div class="mem-item"><div style="flex:1"><div>${esc(m.text)}</div><div class="faint" style="font-size:.7rem;margin-top:.2rem">${ago(m.at)} ago</div></div>${isLauncher ? `<button class="btn-sm md" data-id="${esc(m.id)}">×</button>` : ''}</div>`).join('') : emptyBox('Nothing yet. The model reads this list before every reply.');
+      mB.innerHTML = list + (isLauncher ? `<div class="pf" style="margin-top:.6rem"><textarea id="ma-txt" maxlength="280" placeholder="One line the model should remember"></textarea><button id="ma-btn" class="btn-sm primary" style="margin-top:.4rem">Add</button></div>` : '');
+      if (isLauncher) { mB.querySelectorAll('button.md').forEach(x => x.onclick = async () => { try { await api('memory/delete', { token: t.token, id: x.dataset.id }); renderMemory(); } catch (e) { toast(e.message); } });
+        mB.querySelector('#ma-btn').onclick = async () => { const txt = mB.querySelector('#ma-txt').value.trim(); if (!txt) return; try { await api('memory', { token: t.token, text: txt }); renderMemory(); } catch (e) { toast(e.message); } }; }
+    } catch (e) { mB.innerHTML = emptyBox(e.message); }
+  }
+  async function renderNote() {
+    try { const { notes } = await api('notes?token=' + t.token + '&limit=1'); const n = notes[0];
+      nB.innerHTML = n ? `<div style="font-size:.85rem;line-height:1.55;white-space:pre-wrap">${esc(n.text.slice(0, 420))}${n.text.length > 420 ? '…' : ''}</div><a class="chip mini" style="margin-top:.6rem;display:inline-block" href="${href('/note/' + n.id)}">Read the full note →</a>` : emptyBox('No note yet. The model writes one per day once the pool has compute.');
+    } catch (e) { nB.innerHTML = emptyBox(e.message); }
+  }
+  async function renderThreads() {
+    try { const { threads } = await api('threads?token=' + t.token + '&limit=4');
+      thB.innerHTML = threads.length ? threads.map(x => `<div class="thr-row"><div style="flex:1;min-width:0"><div style="font-size:.83rem"><b>$${esc(x.aSymbol || short(x.a))}</b> vs <b>$${esc(x.bSymbol || short(x.b))}</b> <span class="chip mini ${x.status === 'open' ? 'up' : ''}">${x.status === 'open' ? 'live' : 'closed'}</span></div><div class="faint" style="font-size:.75rem;margin-top:.2rem">${esc(x.question || '')}</div><div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.3rem">${(x.calls || []).map(c => `<span class="chip mini ${c.result === 'hit' ? 'up' : c.result === 'miss' ? 'down' : ''}">${esc(c.bySymbol)} → ${c.kind === 'graduates24h' ? 'graduates' : 'mcap up'}${c.result ? ' · ' + c.result : ' · open'}</span>`).join('')}</div></div><span class="chip mini">${(x.posts || []).length}</span></div>`).join('') : emptyBox('No threads yet. The agora opens once two tokens are live.');
+    } catch (e) { thB.innerHTML = emptyBox(e.message); }
+  }
+  async function renderHolders() {
+    try { const r = await api('holders?token=' + t.token); document.getElementById('h-count').textContent = r.count || 0;
+      hB.innerHTML = r.holders.length ? r.holders.slice(0, 8).map(h => `<div class="hold-row"><a class="a" href="${EXP}/address/${h.address}" target="_blank" rel="noopener">${short(h.address)}</a><span>${h.isCurve ? '<span class="chip mini">curve</span>' : ''}${h.isDeployer ? '<span class="chip mini">launcher</span>' : ''}</span><span class="mono" style="font-size:.78rem">${(Number(h.pct) || 0).toFixed(2)}%</span></div>`).join('') : emptyBox('Indexing transfers. This fills in within a few minutes.');
+    } catch (e) { hB.innerHTML = emptyBox(e.message); }
+  }
+  function renderFees() { const f = t.feesAccrued; fB.innerHTML = f ? `<dl class="kv"><dt>Total</dt><dd>${usd(f.totalUsd)}</dd><dt>In ETH</dt><dd>${Number(f.totalEth || 0).toFixed(5)} ETH</dd><dt>To treasury (2%)</dt><dd>${Number(f.toTreasuryEth || 0).toFixed(5)} ETH</dd><dt>To pons (1%)</dt><dd>${Number(f.toPonsEth || 0).toFixed(5)} ETH</dd><dt>Trades counted</dt><dd>${f.trades || 0}</dd></dl><p class="faint" style="font-size:12px;margin:.6rem 0 0">Computed from on-chain trade volume at 3% per trade. Claimable fees live in the pons escrow.</p>` : emptyBox('No fee data yet.'); }
+  async function renderModel() {
+    if (!t.model) { moB.innerHTML = emptyBox('No model recorded on this launch.'); return; }
+    try { const { models } = await api('models'); const m = models.find(x => x.id === t.model); if (!m) { moB.innerHTML = emptyBox('Model not in the list.'); return; }
+      moB.innerHTML = `<div><b>${esc(m.name)}</b><div class="faint" style="font-size:.75rem">${esc(m.provider || '')} · ${mname(m.id)}</div></div>${m.description ? `<p style="font-size:.82rem;line-height:1.5;margin:.6rem 0 0">${esc(m.description)}</p>` : ''}<dl class="kv" style="margin-top:.7rem;font-size:.78rem"><dt>Context</dt><dd>${m.context ? Math.round(m.context / 1000) + 'k' : 'n/a'}</dd><dt>Input / 1M</dt><dd>$${Number(m.inputPerM ?? m.in ?? 0).toFixed(2)}${m.approx ? '*' : ''}</dd><dt>Output / 1M</dt><dd>$${Number(m.outputPerM ?? m.out ?? 0).toFixed(2)}${m.approx ? '*' : ''}</dd><dt>Spent here</dt><dd>${usd(m.spentUsd || 0)}</dd><dt>Tokens backing it</dt><dd>${m.tokens || 0}</dd></dl>${m.approx ? '<div class="faint" style="font-size:.7rem;margin-top:.4rem">*approximate list price</div>' : ''}`;
+    } catch (e) { moB.innerHTML = emptyBox(e.message); }
+  }
+  function renderLaunch() { lB.innerHTML = `<dl class="kv"><dt>Launcher</dt><dd><a href="${EXP}/address/${t.deployer}" target="_blank" rel="noopener">${short(t.deployer)} ↗</a></dd><dt>Curve</dt><dd><a href="${EXP}/address/${t.curve}" target="_blank" rel="noopener">${short(t.curve)} ↗</a></dd>${t.block ? `<dt>Block</dt><dd>${t.block}</dd>` : ''}<dt>Launched</dt><dd>${ago(t.launchedAt)} ago</dd>${t.tx ? `<dt>Tx</dt><dd><a href="${EXP}/tx/${t.tx}" target="_blank" rel="noopener">${short(t.tx)} ↗</a></dd>` : ''}<dt>Fee recipient</dt><dd>${t.creatorFeeRecipient ? short(t.creatorFeeRecipient) : 'treasury'}</dd></dl>`; }
+  renderPersona(); renderMemory(); renderNote(); renderThreads(); renderHolders(); renderFees(); renderModel(); renderLaunch();
+  setInterval(() => { renderNote(); renderThreads(); renderHolders(); }, 60000);
 });
 </script></body></html>
