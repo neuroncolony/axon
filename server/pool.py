@@ -59,6 +59,7 @@ def _purge_foreign():
         if r.lower() != t: TOKENS.pop(k, None); gone += 1
     if gone: store.save('tokens')
     return gone
+FIRST_AXON_BLOCK = 67690000  # nothing paid our treasury before this block; skip the older pons history
 _ix = {'lastBlock': None, 'at': 0, 'lock': threading.Lock()}
 def refresh(force=False):
     """Sweep recent TokenLaunched logs, adopt tokens whose creatorFeeRecipient is our treasury, re-read curve state for known tokens."""
@@ -66,7 +67,7 @@ def refresh(force=False):
         if not force and time.time() - _ix['at'] < 45: return {'skipped': True}
         st = chain.status()
         if not st.get('ok'): return {'error': st.get('error')}
-        head = st['block']; start = _ix['lastBlock'] or (head - 400000); adopted = 0
+        head = st['block']; start = _ix['lastBlock'] or max(head - 400000, FIRST_AXON_BLOCK); adopted = 0
         for a in range(start, head + 1, 9000):
             try: logs = chain.launch_logs(a, hex(min(a + 8999, head)))
             except Exception: logs = []
