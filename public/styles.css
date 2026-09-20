@@ -41,6 +41,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .nav .pill-right{gap:8px;padding:0 10px}
 .nav-x{display:grid;place-items:center;width:40px;height:40px;border-radius:14px;color:var(--ink);transition:background .4s var(--ease)}
 .nav-x:hover{background:var(--wash);color:var(--ink)}
+.pons-mark{display:block;width:17px;height:17px;background:currentColor;-webkit-mask:url(/static/pons-mark.png) center/contain no-repeat;mask:url(/static/pons-mark.png) center/contain no-repeat}
 .brand{display:inline-flex;align-items:center;gap:10px;padding:0 6px;font-family:var(--head);font-weight:600;font-size:22px;letter-spacing:-.01em;color:var(--ink)}
 .brand:hover{color:var(--ink)}
 .brand .mark{width:28px;height:28px;position:relative;flex:none;color:var(--ink);display:grid;place-items:center}
