@@ -1,5 +1,6 @@
 """axon web server. Static pages + JSON API. Read-only chain access, unsigned tx builders, OpenRouter chat billed to the compute pool.
 Run: python3 server/server.py  (PORT env, default 8791)"""
+import logos
 import json, os, sys, re, secrets, hashlib, threading, time, mimetypes
 from collections import defaultdict, deque
 from http.cookies import SimpleCookie
@@ -61,12 +62,16 @@ class H(BaseHTTPRequestHandler):
     def cookie(self, tok, expired=False):
         return {'Set-Cookie': f'{COOKIE}={tok}; Path=/; HttpOnly; SameSite=Lax; Secure' + ('; Max-Age=0' if expired else '; Max-Age=2592000')}
     def session(self): return get_session(self.token())
-    def body(self):
+    def body(self, limit=64_000):
         n = int(self.headers.get('Content-Length') or 0)
-        if n > 64_000: raise ValueError('Body too large.')
+        if n > limit: raise ValueError('Body too large.')
         d = json.loads(self.rfile.read(n) or b'{}')
         if not isinstance(d, dict): raise ValueError('Send a JSON object.')
         return d
+    def origin(self):
+        proto = self.headers.get('X-Forwarded-Proto', 'https').split(',')[0].strip() or 'https'
+        host = self.headers.get('X-Forwarded-Host') or self.headers.get('Host') or 'localhost'
+        return f'{proto}://{host.split(",")[0].strip()}'
     def csrf_ok(self, s): return bool(s) and self.headers.get('X-CSRF-Token') == s['csrf']
     def api_key_user(self):
         auth = self.headers.get('Authorization', '')
@@ -89,7 +94,11 @@ class H(BaseHTTPRequestHandler):
             print('GET error', path, repr(e), flush=True); return self.error(500, 'Server error.')
     def api_get(self, p, q):
         s = self.session()
-        if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled()})
+        if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled(), 'logoMirror': logos.mirror_enabled()})
+        if p.startswith('logo/'):
+            b, mime = logos.get(p[5:])
+            if not b: return self.error(404, 'No such logo.')
+            return self.send(200, body=b, ctype=mime, headers={'Cache-Control': 'public, max-age=31536000, immutable'})
         if p == 'stats': return self.send(200, pool.stats())
         if p == 'treasury/claim': return self.send(200, chain.claim_tx(q.get('from')))
         if p == 'models':
@@ -157,7 +166,10 @@ class H(BaseHTTPRequestHandler):
         if not path.startswith('api/'): return self.error(404, 'Unknown endpoint.')
         p = path[4:]; ip = self.client_address[0]
         try:
-            d = self.body(); s = self.session()
+            d = self.body(1_400_000 if p == 'logo/upload' else 64_000); s = self.session()
+            if p == 'logo/upload':
+                if not logos.rate_ok(ip): return self.error(429, 'Too many uploads. Try again in a minute.')
+                return self.send(200, logos.put(d.get('data', ''), self.origin()))
             if p == 'auth/nonce':
                 a = chain.addr(d.get('address', '')); n = secrets.token_hex(16); NONCES[n] = (a, time.time())
                 msg = f"{BRAND['displayName']} wants you to sign in with your wallet.\n\nAddress: {a}\nChain: {chain.CHAIN_ID}\nNonce: {n}\nIssued: {store.now()}\n\nThis signature costs nothing and moves no funds."

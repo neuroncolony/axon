@@ -12,7 +12,15 @@
         <label class="field"><span>Symbol</span><input id="f-symbol" maxlength="12" required style="text-transform:uppercase" pattern="[A-Za-z0-9]{1,12}"><span class="hint">Uppercase, 1 to 12 characters.</span></label>
         <label class="field"><span>Model</span><select id="f-model"><option>Loading catalogue…</option></select><span class="hint">The token funds this model. Every trade pays a 2% creator tax to the site treasury on top of the 1% pons fee. Launchers keep no fee share; the tax becomes compute that holders spend talking to the model.</span></label>
         <label class="field"><span>Description</span><textarea id="f-desc" rows="4" maxlength="500"></textarea><span class="hint">Up to 500 characters.</span></label>
-        <label class="field"><span>Logo URL</span><input id="f-logo" type="url" placeholder="https://…"><span class="hint">Optional. Must be an https URL.</span></label>
+        <div class="field"><span>Logo</span>
+          <div class="logo-pick" id="logo-pick">
+            <button type="button" class="lp-tile active" data-src="model"><img id="lp-model-img" alt=""><span class="lp-name">Model's logo</span><span class="lp-sub" id="lp-model-sub">Uses the provider mark</span></button>
+            <button type="button" class="lp-tile" data-src="own"><span class="lp-frame" id="lp-own-frame"><span class="lp-plus">+</span></span><span class="lp-name">Your own</span><span class="lp-sub" id="lp-own-sub">Upload, crop, rotate</span></button>
+          </div>
+          <input type="file" id="f-file" accept="image/png,image/jpeg,image/webp" hidden>
+          <div class="lp-actions" id="lp-actions" hidden><button type="button" class="btn xs ghost" id="lp-edit">Edit crop</button><button type="button" class="btn xs ghost" id="lp-replace">Replace</button><button type="button" class="btn xs ghost" id="lp-remove">Remove</button></div>
+          <span class="hint">Shown on the token page, in markets and on every launch popup. Square, 512 px, hosted by the site.</span>
+        </div>
         <label class="field"><span>Website</span><input id="f-website" type="url" placeholder="https://…"><span class="hint">Optional.</span></label>
         <label class="field"><span>X link</span><input id="f-twitter" type="url" placeholder="https://x.com/…"><span class="hint">Optional.</span></label>
         <label class="field"><span>Telegram link</span><input id="f-telegram" type="url" placeholder="https://t.me/…"><span class="hint">Optional.</span></label>
@@ -51,6 +59,75 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showErr = m => { notice.innerHTML = `<div class="notice bad">${esc(m)}</div>`; };
   const showOk = m => { notice.innerHTML = `<div class="notice ok">${esc(m)}</div>`; };
   let status = null;
+  const provKey = p => String(p || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const provUrl = p => new URL(href('/static/providers/' + provKey(p) + '.svg'), location.origin).href;
+  let modelsById = {}; const logo = { src: 'model', ownUrl: null, ownData: null, raw: null, edit: null };
+  const pick = document.getElementById('logo-pick'); const fileIn = document.getElementById('f-file'); const actions = document.getElementById('lp-actions');
+  function paintLogo() {
+    for (const t of pick.querySelectorAll('.lp-tile')) t.classList.toggle('active', t.dataset.src === logo.src);
+    const m = modelsById[document.getElementById('f-model').value];
+    const img = document.getElementById('lp-model-img'); img.src = m ? provUrl(m.provider) : ''; img.onerror = () => { img.src = href('/api/token/0x0000000000000000000000000000000000000000/logo'); };
+    document.getElementById('lp-model-sub').textContent = m ? m.provider + ' mark' : 'Uses the provider mark';
+    const fr = document.getElementById('lp-own-frame');
+    fr.innerHTML = logo.ownData ? `<img src="${logo.ownData}" alt="">` : '<span class="lp-plus">+</span>';
+    document.getElementById('lp-own-sub').textContent = logo.ownData ? 'Cropped, 512 px' : 'Upload, crop, rotate';
+    actions.hidden = !(logo.src === 'own' && logo.ownData);
+  }
+  pick.addEventListener('click', e => {
+    const t = e.target.closest('.lp-tile'); if (!t) return;
+    if (t.dataset.src === 'own' && !logo.ownData) { fileIn.click(); return; }
+    logo.src = t.dataset.src; paintLogo();
+  });
+  fileIn.addEventListener('change', () => { const f = fileIn.files[0]; fileIn.value = ''; if (!f) return; if (f.size > 12e6) return showErr('Pick an image under 12 MB.'); const r = new FileReader(); r.onload = () => { const im = new Image(); im.onload = () => openCropper(im, null); im.onerror = () => showErr('That file could not be read as an image.'); im.src = r.result; }; r.readAsDataURL(f); });
+  document.getElementById('lp-replace').onclick = () => fileIn.click();
+  document.getElementById('lp-edit').onclick = () => { if (logo.raw) openCropper(logo.raw, logo.edit); };
+  document.getElementById('lp-remove').onclick = () => { logo.ownData = null; logo.ownUrl = null; logo.raw = null; logo.edit = null; logo.src = 'model'; paintLogo(); };
+  document.getElementById('f-model').addEventListener('change', paintLogo);
+
+  /* cropper: pan (drag), zoom (wheel, pinch, slider), rotate (90 steps + fine), flip, fit, fill, reset. Exports 512 px PNG. */
+  function openCropper(img, prev) {
+    const S = 320, OUT = 512;
+    const st = prev ? { ...prev } : { x: 0, y: 0, zoom: 1, rot: 0, flip: false };
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<div class="card cropper"><div class="section-head" style="margin-bottom:.25rem"><h2>Crop your logo</h2><button class="copy" data-x type="button">close</button></div>
+      <p class="muted" style="margin:.25rem 0 .75rem;font-size:.85rem">Drag to move. Scroll or pinch to zoom. The circle shows how it renders on cards.</p>
+      <div class="crop-stage" id="crop-stage"><canvas id="crop-cv" width="${S}" height="${S}"></canvas><div class="crop-mask"></div></div>
+      <div class="crop-row"><span class="lbl">Zoom</span><input type="range" id="c-zoom" min="0.2" max="6" step="0.01" value="${st.zoom}"></div>
+      <div class="crop-row"><span class="lbl">Rotate</span><input type="range" id="c-rot" min="-180" max="180" step="1" value="${st.rot}"><span class="mono" id="c-rot-v">${st.rot}&deg;</span></div>
+      <div class="crop-tools"><button type="button" class="btn xs ghost" data-a="l">&#8634; 90&deg;</button><button type="button" class="btn xs ghost" data-a="r">&#8635; 90&deg;</button><button type="button" class="btn xs ghost" data-a="flip">Flip</button><button type="button" class="btn xs ghost" data-a="fit">Fit</button><button type="button" class="btn xs ghost" data-a="fill">Fill</button><button type="button" class="btn xs ghost" data-a="reset">Reset</button></div>
+      <div class="crop-foot"><button type="button" class="btn sm ghost" data-x>Cancel</button><button type="button" class="btn sm accent" data-ok>Use this logo</button></div></div>`;
+    document.body.appendChild(m);
+    const cv = m.querySelector('#crop-cv'), ctx = cv.getContext('2d'), zoomIn = m.querySelector('#c-zoom'), rotIn = m.querySelector('#c-rot'), rotV = m.querySelector('#c-rot-v');
+    const base = Math.max(S / img.width, S / img.height); // zoom 1 = fill the square
+    function draw(c, size) {
+      const k = size / S; c.clearRect(0, 0, size, size); c.fillStyle = '#F3F5F9'; c.fillRect(0, 0, size, size);
+      c.save(); c.translate(size / 2 + st.x * k, size / 2 + st.y * k); c.rotate(st.rot * Math.PI / 180); if (st.flip) c.scale(-1, 1);
+      const sc = base * st.zoom * k; c.imageSmoothingQuality = 'high'; c.drawImage(img, -img.width * sc / 2, -img.height * sc / 2, img.width * sc, img.height * sc); c.restore();
+    }
+    const norm = r => ((r + 180) % 360 + 360) % 360 - 180;
+    const render = () => { draw(ctx, S); zoomIn.value = st.zoom; rotIn.value = norm(st.rot); rotV.textContent = Math.round(norm(st.rot)) + '\u00b0'; };
+    render();
+    let drag = null; const stage = m.querySelector('#crop-stage');
+    stage.addEventListener('pointerdown', e => { drag = { x: e.clientX - st.x, y: e.clientY - st.y }; stage.setPointerCapture(e.pointerId); });
+    stage.addEventListener('pointermove', e => { if (!drag) return; st.x = e.clientX - drag.x; st.y = e.clientY - drag.y; render(); });
+    stage.addEventListener('pointerup', () => { drag = null; }); stage.addEventListener('pointercancel', () => { drag = null; });
+    stage.addEventListener('wheel', e => { e.preventDefault(); st.zoom = Math.min(6, Math.max(0.2, st.zoom * (e.deltaY < 0 ? 1.06 : 0.94))); render(); }, { passive: false });
+    let pinch = null; const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    stage.addEventListener('touchstart', e => { if (e.touches.length === 2) pinch = { d: dist(e.touches), z: st.zoom }; }, { passive: true });
+    stage.addEventListener('touchmove', e => { if (pinch && e.touches.length === 2) { st.zoom = Math.min(6, Math.max(0.2, pinch.z * dist(e.touches) / pinch.d)); render(); } }, { passive: true });
+    stage.addEventListener('touchend', () => { pinch = null; });
+    zoomIn.oninput = () => { st.zoom = +zoomIn.value; render(); };
+    rotIn.oninput = () => { st.rot = +rotIn.value; render(); };
+    m.querySelector('.crop-tools').onclick = e => { const a = e.target.closest('[data-a]'); if (!a) return; const k = a.dataset.a;
+      if (k === 'l') st.rot -= 90; if (k === 'r') st.rot += 90; if (k === 'flip') st.flip = !st.flip; if (k === 'fill') { st.zoom = 1; st.x = st.y = 0; }
+      if (k === 'fit') { st.zoom = Math.min(S / img.width, S / img.height) / base; st.x = st.y = 0; } if (k === 'reset') { st.x = st.y = 0; st.zoom = 1; st.rot = 0; st.flip = false; } render(); };
+    m.onclick = e => { if (e.target === m || e.target.dataset.x !== undefined) m.remove(); };
+    m.querySelector('[data-ok]').onclick = () => {
+      const out = document.createElement('canvas'); out.width = out.height = OUT; draw(out.getContext('2d'), OUT);
+      let data = out.toDataURL('image/png'); if (data.length > 1.1e6) data = out.toDataURL('image/jpeg', 0.9);
+      logo.ownData = data; logo.ownUrl = null; logo.raw = img; logo.edit = { ...st }; logo.src = 'own'; m.remove(); paintLogo();
+    };
+  }
   api('status').then(s => {
     status = s;
     document.getElementById('w-fee').textContent = `${s.launchFeeEth} ETH`;
@@ -62,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     sel.innerHTML = '';
     const want = new URLSearchParams(location.search).get('model');
     for (const m of models) { const o = document.createElement('option'); o.value = m.id; o.textContent = `${m.name} (${m.provider})`; if (m.id === want) o.selected = true; sel.appendChild(o); }
+    modelsById = Object.fromEntries(models.map(m => [m.id, m])); paintLogo();
   }).catch(e => showErr(e.message));
   document.getElementById('form').addEventListener('submit', async e => {
     e.preventDefault();
@@ -70,23 +148,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const symbol = document.getElementById('f-symbol').value.trim().toUpperCase();
     const model = document.getElementById('f-model').value;
     const description = document.getElementById('f-desc').value.trim();
-    const logo = document.getElementById('f-logo').value.trim();
     const website = document.getElementById('f-website').value.trim();
     const twitter = document.getElementById('f-twitter').value.trim();
     const telegram = document.getElementById('f-telegram').value.trim();
     if (!name) return showErr('Enter a name.');
     if (!/^[A-Z0-9]{1,12}$/.test(symbol)) return showErr('Symbol must be 1 to 12 characters, letters and numbers only.');
     if (!model || model.startsWith('Loading')) return showErr('Pick a model.');
-    if (logo && !logo.startsWith('https://')) return showErr('Logo URL must start with https://');
+    if (logo.src === 'own' && !logo.ownData) return showErr('Crop your logo first, or use the model logo.');
     for (const [k, v] of [['Website', website], ['X link', twitter], ['Telegram link', telegram]]) if (v && !v.startsWith('https://')) return showErr(k + ' must start with https://');
     submit.disabled = true;
     try {
       await ensureChain();
-      const prep = await api('launch/prepare', { name, symbol, description, logo, model, website, twitter, telegram });
+      let logoUrl = provUrl(modelsById[model]?.provider);
+      if (logo.src === 'own') { if (!logo.ownUrl) { submit.textContent = 'Uploading logo…'; const up = await api('logo/upload', { data: logo.ownData }); logo.ownUrl = up.url; } logoUrl = logo.ownUrl; }
+      submit.textContent = 'Confirm in wallet…';
+      const prep = await api('launch/prepare', { name, symbol, description, logo: logoUrl, model, website, twitter, telegram });
       const { hash } = await sendTx(prep.tx, prep.tx.to);
       let done = null;
       for (let i = 0; i <= 6; i++) {
-        try { done = await api('launch/confirm', { tx: hash, model, logo, description }); break; }
+        try { done = await api('launch/confirm', { tx: hash, model, logo: logoUrl, description }); break; }
         catch (err) {
           if (!/no pons v2 launch event yet/i.test(err.message) || i === 6) throw err;
           await new Promise(r => setTimeout(r, 3000));
@@ -96,7 +176,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       notice.innerHTML = `<div class="notice ok">Launched. <a href="${href('/token/' + addr)}">Open the token page →</a> <a class="btn sm" style="margin-left:.5rem" href="${href('/chat')}">Open chat</a></div>`;
       toast('Token launched.');
     } catch (err) { showErr(err.message); }
-    submit.disabled = false;
+    submit.disabled = false; submit.textContent = 'Launch token';
   });
 });
 </script></body></html>

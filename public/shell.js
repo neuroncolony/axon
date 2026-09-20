@@ -97,6 +97,25 @@ window.AXON = (() => {
     const stuck = () => { if (window.scrollY > 8) nav.setAttribute('data-stuck',''); else nav.removeAttribute('data-stuck'); };
     if (!nav.dataset.scrollBound) { nav.dataset.scrollBound = '1'; addEventListener('scroll', stuck, { passive: true }); }
     stuck();
+    // sliding indicator under the active tab; follows hover and returns to the active page
+    const links = $('.nav-links', nav); if (links) {
+      const ind = document.createElement('span'); ind.className = 'nav-ind'; links.appendChild(ind);
+      const moveTo = a => { if (!a) { ind.classList.remove('on'); return; } ind.style.left = (a.offsetLeft + 12) + 'px'; ind.style.width = Math.max(0, a.offsetWidth - 24) + 'px'; ind.classList.add('on'); };
+      const active = () => links.querySelector('a.active');
+      requestAnimationFrame(() => { ind.style.transition = 'none'; moveTo(active()); requestAnimationFrame(() => { ind.style.transition = ''; }); });
+      for (const a of links.querySelectorAll('a')) a.addEventListener('mouseenter', () => moveTo(a));
+      links.addEventListener('mouseleave', () => moveTo(active()));
+      addEventListener('resize', () => moveTo(active()), { passive: true });
+    }
+    // fade the page out before a same-site navigation when the browser lacks cross-document view transitions
+    if (!nav.dataset.navBound) { nav.dataset.navBound = '1'; document.addEventListener('click', e => {
+      const a = e.target.closest('a[href]'); if (!a || a.target === '_blank' || a.hasAttribute('download') || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      const u = new URL(a.href, location.href); if (u.origin !== location.origin || (u.pathname === location.pathname && u.hash)) return;
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (CSS.supports && CSS.supports('view-transition-name', 'x') && 'navigation' in window) return; // native cross document transition handles it
+      const pg = document.querySelector('main.page'); if (!pg) return;
+      e.preventDefault(); pg.classList.add('leaving'); setTimeout(() => { location.href = u.href; }, 190);
+    }); }
     for (const b of document.querySelectorAll('[data-connect]')) b.addEventListener('click', () => openWalletModal().catch(e => e.message !== 'Cancelled.' && toast(e.message)));
     for (const b of document.querySelectorAll('[data-acct]')) b.addEventListener('click', () => { if (confirm('Disconnect this wallet from the page?')) { state.provider = null; state.address = null; session = null; localStorage.removeItem('axon.wallet'); api('auth/logout', {}).catch(()=>{}); renderNav(); } });
     $('#burger')?.addEventListener('click', () => $('#navm').classList.toggle('open'));
