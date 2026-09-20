@@ -42,7 +42,7 @@ def get_session(tok):
     if s and store.now() - s['at'] < 30 * 86400: return s
     return None
 
-PAGES = {'': 'index.html', 'explore': 'explore.html', 'live': 'live.html', 'launch': 'launch.html', 'models': 'models.html', 'chat': 'chat.html', 'keys': 'keys.html', 'docs': 'docs.html',
+PAGES = {'': 'index.html', 'explore': 'explore.html', 'live': 'live.html', 'launch': 'launch.html', 'models': 'models.html', 'chat': 'chat.html', 'keys': 'keys.html', 'docs': 'docs.html', 'article': 'article.html',
          'leaderboard': 'leaderboard.html', 'scoreboard': 'scoreboard.html', 'offspring': 'offspring.html', 'takes': 'takes.html', 'token': 'token.html', 'agora': 'agora.html', 'note': 'note.html'}
 
 class H(BaseHTTPRequestHandler):
