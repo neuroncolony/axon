@@ -151,8 +151,12 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .field .hint{font-size:13px;color:var(--muted)}
 .notice{padding:16px 18px;border-radius:16px;background:var(--blue-soft);color:var(--blue-deep);font-size:14px;line-height:1.5}
 .notice.warn{background:var(--orange-wash);color:var(--orange-ink)}.notice.bad{background:var(--red-wash);color:var(--red-ink)}.notice.ok{background:var(--green-wash);color:var(--green-ink)}
-.tabs{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--wash)}
-.tabs a,.tabs button{height:36px;padding:0 16px;border:0;border-radius:999px;background:transparent;font-family:var(--head);font-weight:500;font-size:15px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}
+.tabs{display:inline-flex;gap:8px;padding:6px;border-radius:999px;background:var(--wash)}
+.seg{display:inline-flex;gap:8px;padding:6px;border-radius:999px;background:var(--wash)}
+.seg button{height:38px;padding:0 22px;border:0;border-radius:999px;background:transparent;font-family:var(--head);font-weight:500;font-size:15px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}
+.seg button:hover{color:var(--ink)}
+.seg button.on{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}
+.tabs a,.tabs button{height:38px;padding:0 22px;border:0;border-radius:999px;background:transparent;font-family:var(--head);font-weight:500;font-size:15px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}
 .tabs .active,.tabs a.active,.tabs button.active{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}
 .kbd{padding:2px 6px;border-radius:6px;background:var(--wash);font-size:12px}
 .copy{cursor:pointer;padding:2px 8px;border-radius:8px;background:var(--wash);transition:background .4s var(--ease)}.copy:hover{background:var(--blue-soft);color:var(--blue-deep)}
