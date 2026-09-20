@@ -169,7 +169,18 @@ def enrich(rec, px=None, ts=None):
             'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url}
 def _ours():
     t = (chain.treasury() or '').lower()
-    return [r for r in TOKENS.values() if t and (r.get('creatorFeeRecipient') or '').lower() == t]
+    if not t: return []
+    out = []; dirty = False
+    for r in TOKENS.values():
+        fr = r.get('creatorFeeRecipient')
+        if fr is None:
+            try:
+                fr = chain.launched(r['token'])['creatorFeeRecipient']; r['creatorFeeRecipient'] = fr; dirty = True
+            except Exception:
+                continue
+        if (fr or '').lower() == t: out.append(r)
+    if dirty: store.save('tokens')
+    return out
 def token_list(sort='new', model=None, status=None, limit=50):
     px = eth_usd(); ts = _trade_stats()
     rows = [enrich(r, px, ts) for r in _ours()]
