@@ -18,7 +18,7 @@
       <p class="hint" style="margin-top:1rem">Trades are counted when made through this site. Trades made elsewhere are not indexed yet.</p>
     </div>
     <div>
-      <div class="card" id="treasury-card">
+      <div class="card" id="treasury-card" style="display:none">
         <div class="eyebrow">Treasury</div>
         <p style="margin:.5rem 0 0"><a id="treasury-link" class="mono" href="#" target="_blank" rel="noopener">…</a></p>
         <p style="margin:.5rem 0 0" id="claimable-line">Claimable now: …</p>
@@ -109,12 +109,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     claimableLine.textContent = 'Claimable now: ' + (c == null ? 'unknown' : Number(c).toFixed(4) + ' ETH');
     claimBtn.disabled = !has;
     claimBtn.textContent = has ? 'Claim to treasury' : 'Nothing to claim yet';
+    syncCardVisibility();
   }
-  function checkWallet() {
-    if (!treasury) return;
+  const treasuryCard = document.getElementById('treasury-card');
+  function syncCardVisibility() {
     const addr = (AXON.state.address || '').toLowerCase();
-    if (addr && addr !== treasury) AXON.toast('Connect the treasury wallet (' + shortAddr(treasury) + ') to claim.');
+    const owner = !!treasury && addr === treasury;
+    treasuryCard.style.display = owner ? '' : 'none';
   }
+  function checkWallet() { syncCardVisibility(); }
   claimBtn.addEventListener('click', async () => {
     try {
       if (!AXON.state.address) { await AXON.openWalletModal(); return; }
