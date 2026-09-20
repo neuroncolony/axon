@@ -198,6 +198,8 @@ def _has_launch_event(token):
 
 def events(limit=400):
     rows = store.read_jsonl('events', limit)
+    # events written before the foreign purge still name tokens this site does not list
+    rows = [r for r in rows if not r.get('token') or (r.get('token') or '').lower() in TOKENS]
     # one launch row per token: re-indexing after a data reset used to append a second one
     seen, out = set(), []
     for r in rows:
@@ -242,7 +244,8 @@ def candles(token, interval_s=300, limit=200):
     spot = out[-1]['c'] if out else None
     return {'candles': out, 'priceEth': spot, 'ethUsd': px}
 def live_feed(limit=60, token=None):
-    rows = events(600) + [{'type': 'take', **t} for t in store.read_jsonl('takes', 200)] + [{'type': 'bet', **b} for b in store.read_jsonl('bets', 200)]
+    ours = lambda r: not r.get('token') or (r.get('token') or '').lower() in TOKENS
+    rows = events(2000) + [{'type': 'take', **t} for t in store.read_jsonl('takes', 200) if ours(t)] + [{'type': 'bet', **b} for b in store.read_jsonl('bets', 200) if ours(b)]
     if token: rows = [r for r in rows if r.get('token') == token]
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 def takes(limit=60, token=None):
