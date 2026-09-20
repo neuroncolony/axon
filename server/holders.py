@@ -16,9 +16,10 @@ def index_holders(rec, head, TOKENS_ref_not_needed=None):
     token = rec.get('token') or ''
     key = token.lower()
     if not key or not rec.get('block') or not head: return 0
-    start = int(rec.get('lastHolderBlock') or rec['block']) + 1
-    if start > head: return 0
     balances = store.load('holders', {}).setdefault(key, {})
+    # the mint Transfer lives in the launch block itself, so include it; rescan from launch if nothing was ever recorded
+    start = int(rec['block']) if (not balances or not rec.get('lastHolderBlock')) else int(rec['lastHolderBlock']) + 1
+    if start > head: return 0
     applied = 0
     try:
         for a in range(start, head + 1, CHUNK):
@@ -86,7 +87,8 @@ def recent_events(events_rows, since, TOKENS):
     out = []
     for r in events_rows or []:
         if (r.get('type') not in EVENT_TYPES) or not (r.get('at', 0) > (since or 0)): continue
-        rec = TOKENS.get((r.get('token') or '').lower(), {})
+        rec = TOKENS.get((r.get('token') or '').lower())
+        if not rec: continue  # only tokens launched through axon
         out.append({'type': r.get('type'), 'token': r.get('token'), 'symbol': r.get('symbol') or rec.get('symbol'),
                     'logoUrl': '/api/token/' + (r.get('token') or '') + '/logo',
                     'name': rec.get('name'), 'model': r.get('model') or rec.get('model'),
