@@ -246,6 +246,9 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .section-head h2{font-size:clamp(26px,2.6vw,36px)}
 .page .grid.c4 .card,.page .grid.c3 .card{padding:18px 20px}
 /* table + feed atoms */
+.feed .tabs,.tabs+.feed{margin-top:14px}
+.feed-item .logo,.feed-item .who img{width:22px;height:22px;border-radius:7px;background:var(--blue-soft);box-shadow:0 0 0 1px var(--line);object-fit:cover;flex:none;display:inline-block}
+.feed-item .who{flex-wrap:wrap;min-width:0}.feed-item{overflow:hidden}
 .tok .logo,.table .logo{width:32px;height:32px;border-radius:10px;background:var(--blue-soft);box-shadow:0 0 0 1px var(--line);object-fit:cover;flex:none;display:inline-block}
 .tok .n{color:var(--ink)}
 .feed-item{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start}
