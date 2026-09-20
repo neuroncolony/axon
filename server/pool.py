@@ -27,6 +27,12 @@ def eth_usd():
     return _eth['usd']
 
 TOKENS = store.load('tokens', {})
+def _load_trades():
+    out = {}
+    for r in store.read_jsonl('trades', 100000):
+        out.setdefault(r.get('token','').lower(), []).append(r)
+    for rows in out.values(): rows.sort(key=lambda r: (r.get('block',0), r.get('logIndex',0)))
+    return out
 LEDGER = store.load('ledger', {'spentUsd': 0.0, 'messages': 0, 'byModel': {}, 'byAddress': {}})
 
 def _record(snap, model=None, logo='', description='', tx=None, block=None):
@@ -59,6 +65,29 @@ def _purge_foreign():
         if r.lower() != t: TOKENS.pop(k, None); gone += 1
     if gone: store.save('tokens')
     return gone
+def _index_trades(head):
+    """Pull Buy/Sell events for every adopted token since its lastTradeBlock. Chunks of 5000 blocks, deduped by tx+logIndex."""
+    for key, rec in list(TOKENS.items()):
+        start = int(rec.get('lastTradeBlock') or rec.get('block') or FIRST_AXON_BLOCK) + 1
+        if start > head: continue
+        rows = TRADES.setdefault(key, [])
+        seen = {(r['tx'], r.get('logIndex')) for r in rows}
+        try:
+            for a in range(start, head + 1, 5000):
+                for t in chain.trade_logs(rec['curve'], a, hex(min(a + 4999, head))):
+                    if (t['tx'], t['logIndex']) in seen: continue
+                    t['token'] = rec['token']; t['at'] = chain.block_timestamp(t['block'])
+                    eth_w, tok_w = int(t['ethWei']), int(t['tokenWei'])
+                    t['priceEth'] = (eth_w / tok_w) if tok_w else None
+                    rows.append(t); seen.add((t['tx'], t['logIndex'])); store.append('trades', t)
+                    store.append('events', {'type': t['side'], 'token': rec['token'], 'symbol': rec.get('symbol'), 'model': rec.get('model'),
+                                            'by': t['trader'], 'ethWei': t['ethWei'], 'tokenWei': t['tokenWei'], 'tx': t['tx'], 'at': t['at']})
+            rec['lastTradeBlock'] = head
+        except Exception as e: print('trade index', rec.get('symbol'), repr(e), flush=True)
+        if rec.get('logo') in ('', None) and not rec.get('logoChecked') and rec.get('tx'):
+            try: rec['logo'] = chain.launch_logo(rec['tx']); rec['logoChecked'] = True
+            except Exception: pass
+
 FIRST_AXON_BLOCK = 67690000  # nothing paid our treasury before this block; skip the older pons history
 _ix = {'lastBlock': None, 'at': 0, 'lock': threading.Lock()}
 def refresh(force=False):
@@ -82,6 +111,7 @@ def refresh(force=False):
                 except Exception: pass
         _ix['lastBlock'] = head; _ix['at'] = time.time()
         _purge_foreign()
+        _index_trades(head)
         for rec in sorted(TOKENS.values(), key=lambda r: r.get('updatedAt', 0))[:12]:
             try:
                 snap = chain.token_snapshot(rec['token'])
@@ -102,27 +132,35 @@ def start_indexer():
     threading.Thread(target=loop, daemon=True).start()
 
 # ------------------------------------------------------------------ views
-def _trade_stats(evs=None):
-    """One pass over the events file: {token: (volume_eth_24h, trades_24h)}. Pass the result to enrich() when building lists."""
+TRADES = _load_trades()  # {token_lower: [{side, trader, ethWei, tokenWei, priceEth, tx, block, at}, ...]}
+
+def _trade_stats():
+    """Sum on-chain trades last 24h. {token: (volume_eth, count)}"""
     cut = store.now() - 86400; out = {}
-    for e in (evs if evs is not None else events()):
-        if e.get('type') == 'trade' and e.get('at', 0) > cut:
-            v, n = out.get(e.get('token'), (0.0, 0)); out[e.get('token')] = (v + float(e.get('ethValue', 0)), n + 1)
+    for tk, rows in TRADES.items():
+        for r in rows:
+            if r.get('at', 0) > cut:
+                v, n = out.get(tk, (0.0, 0)); out[tk] = (v + int(r.get('ethWei', 0)) / 1e18, n + 1)
     return out
 def enrich(rec, px=None, ts=None):
     px = eth_usd() if px is None else px; px = px or 0
     if ts is None: ts = _trade_stats()
-    vol, n = ts.get(rec['token'], (0.0, 0))
+    vol_eth, n = ts.get(rec['token'].lower(), (0.0, 0))
     cs = rec.get('curveState') or {}; thr = None
     try:
-        raised = int(cs.get('totalRaised') or cs.get('balanceWei') or 0); target = int(cs.get('graduationThreshold') or 0)
+        raised = int(cs.get('balanceWei') or 0); target = int(cs.get('graduationThreshold') or 0)
         thr = min(1.0, raised / target) if target else None
     except Exception: pass
+    graduated = cs.get('graduated') is True or rec.get('phase') == 2
+    last_rows = TRADES.get(rec['token'].lower(), [])
+    last_at = last_rows[-1]['at'] if last_rows else None
+    logo_url = '/api/token/' + rec['token'] + '/logo'
     return {**rec, 'priceUsd': (rec.get('priceEth') or 0) * px if rec.get('priceEth') else None,
             'marketCapUsd': (rec.get('marketCapEth') or 0) * px if rec.get('marketCapEth') else None,
-            'graduation': thr, 'status': 'Graduated' if rec.get('phase') == 2 or cs.get('graduated') else 'Curve',
+            'volume24hEth': vol_eth, 'volume24hUsd': vol_eth * px, 'trades24h': n,
+            'graduation': thr, 'status': 'Graduated' if graduated else 'Curve',
             'age': store.now() - rec.get('launchedAt', store.now()), 'modelName': M.BY_ID.get(rec.get('model') or '', {}).get('name'),
-            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'volume24hUsd': vol * px, 'trades24h': n}
+            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url}
 def _ours():
     t = (chain.treasury() or '').lower()
     return [r for r in TOKENS.values() if t and (r.get('creatorFeeRecipient') or '').lower() == t]
@@ -149,14 +187,38 @@ def token_detail(addr):
 def events(limit=400): return store.read_jsonl('events', limit)
 def volume24(token):
     cut = store.now() - 86400
-    return sum(float(e.get('ethValue', 0)) for e in events() if e.get('token') == token and e.get('type') == 'trade' and e.get('at', 0) > cut)
+    return sum(int(r.get('ethWei', 0)) / 1e18 for r in TRADES.get(token.lower(), []) if r.get('at', 0) > cut)
 def trades24(token):
     cut = store.now() - 86400
-    return sum(1 for e in events() if e.get('token') == token and e.get('type') == 'trade' and e.get('at', 0) > cut)
+    return sum(1 for r in TRADES.get(token.lower(), []) if r.get('at', 0) > cut)
 def record_trade(token, side, eth_wei, sender, tx):
-    rec = TOKENS.get(token.lower())
-    store.append('events', {'type': 'trade', 'side': side, 'token': rec['token'] if rec else token, 'symbol': rec.get('symbol') if rec else None, 'ethValue': int(eth_wei) / 1e18, 'by': sender, 'tx': tx, 'at': store.now()})
-    return {'ok': True}
+    return {'ok': True}  # trades are now indexed from the chain; this endpoint exists for API compat only
+def on_chain_trades(token=None, limit=100):
+    """Newest-first list of on-chain trades. Without token: across all tokens (each row has token+symbol)."""
+    rows = []
+    if token:
+        rows = list(TRADES.get(token.lower(), []))
+    else:
+        for tk, trows in TRADES.items():
+            rec = TOKENS.get(tk, {}); sym = rec.get('symbol')
+            rows.extend({**r, 'token': rec.get('token', tk), 'symbol': sym} for r in trows)
+    return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
+def candles(token, interval_s=300, limit=200):
+    """OHLCV candles built from on-chain trades. Falls back to a single spot-price candle when there are none."""
+    rows = sorted(TRADES.get(token.lower(), []), key=lambda r: r.get('at', 0))
+    px = eth_usd() or 1; now = store.now()
+    if not rows:
+        rec = TOKENS.get(token.lower(), {}); spot = rec.get('priceEth')
+        c = {'t': (now // interval_s) * interval_s, 'o': spot, 'h': spot, 'l': spot, 'c': spot, 'vEth': 0.0} if spot else {'t': (now // interval_s) * interval_s, 'o': None, 'h': None, 'l': None, 'c': None, 'vEth': 0.0}
+        return {'candles': [c], 'priceEth': spot, 'ethUsd': px}
+    buckets = {}
+    for r in rows:
+        t = (r['at'] // interval_s) * interval_s; p = r.get('priceEth') or 0; v = int(r.get('ethWei', 0)) / 1e18
+        if t not in buckets: buckets[t] = {'t': t, 'o': p, 'h': p, 'l': p, 'c': p, 'vEth': v}
+        else: b = buckets[t]; b['h'] = max(b['h'], p); b['l'] = min(b['l'], p); b['c'] = p; b['vEth'] += v
+    out = sorted(buckets.values(), key=lambda b: b['t'])[-limit:]
+    spot = out[-1]['c'] if out else None
+    return {'candles': out, 'priceEth': spot, 'ethUsd': px}
 def live_feed(limit=60, token=None):
     rows = events(600) + [{'type': 'take', **t} for t in store.read_jsonl('takes', 200)] + [{'type': 'bet', **b} for b in store.read_jsonl('bets', 200)]
     if token: rows = [r for r in rows if r.get('token') == token]

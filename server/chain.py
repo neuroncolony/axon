@@ -21,6 +21,12 @@ SOCIALS = '(string,string,string,string,string)'
 PARAM_TUPLE = '(string,string,string,string,' + SOCIALS + ',address,uint16,bool,bytes32,bytes32)'
 LAUNCH_TOPIC = '0x' + keccak(text='TokenLaunched(address,address,address,address,uint256,uint256)').hex()
 EXPLORER = 'https://robinhoodchain.blockscout.com'
+# Trade events are emitted by the curve itself. BUY data = [ethIn, tokensOut, protocolFee, creatorFee].
+# SELL data = [tokensIn, ethOut, protocolFee, creatorFee] (confirmed against the ERC20 Transfer into the curve).
+BUY_TOPIC = '0xec36bf571f136799e8dc0b0b8bea4b04d8bd3d43de838aab0d5fc21d4cbfc455'
+SELL_TOPIC = '0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df'
+TRADE_TOPICS = [BUY_TOPIC, SELL_TOPIC]
+FEE_BPS_TOTAL = 300  # feeBps 100 + creatorTaxBps 200, taken from the ETH side of every trade
 
 _cache, _lock = {}, threading.Lock()
 
@@ -39,7 +45,7 @@ def eth(value):
     whole, fraction = divmod(int(value), 10**18)
     return str(whole) + (('.' + str(fraction).zfill(18).rstrip('0')) if fraction else '')
 
-READ_METHODS = {'eth_chainId','eth_call','eth_getCode','eth_getBalance','eth_blockNumber','eth_getLogs','eth_getTransactionReceipt','eth_getBlockByNumber'}
+READ_METHODS = {'eth_chainId','eth_call','eth_getCode','eth_getBalance','eth_blockNumber','eth_getLogs','eth_getTransactionReceipt','eth_getBlockByNumber','eth_getTransactionByHash'}
 def rpc(method, params):
     if method not in READ_METHODS: raise ChainError('Read method not permitted.')
     data = None
@@ -106,20 +112,20 @@ def launched(token):
             'graduationThreshold':str(u(words[5])),'poolFee':u(words[6]),'creatorTaxBps':u(words[8]),'buybackEnabled':bool(u(words[9])),'phase':u(words[10])}
 
 def curve_state(curve):
-    """Best-effort reads from the bonding curve. Each call is isolated so one missing getter does not kill the row."""
-    out = {}
-    for key, sig, ret in (('graduated','graduated()',['bool']),('ethReserve','ethReserve()',['uint256']),('tokenReserve','tokenReserve()',['uint256']),
-                          ('totalRaised','totalRaised()',['uint256']),('graduationThreshold','graduationThreshold()',['uint256'])):
-        try: out[key] = call(curve, sig, returns=ret)[0]
-        except Exception: out[key] = None
-    try: out['balanceWei'] = int(rpc('eth_getBalance',[addr(curve),'latest']),16)
-    except Exception: out['balanceWei'] = None
-    # spot quote for 0.001 ETH gives an implied price
-    try:
-        raw = rpc('eth_call',[{'to':addr(curve),'data':calldata('buy(uint256)',['uint256'],[0]),'value':hex(10**15)},'latest'])
-        got = decode(['uint256'],bytes.fromhex(raw[2:]))[0]
-        out['priceEth'] = (10**15 / got) if got else None
-    except Exception: out['priceEth'] = None
+    """Reads from the bonding curve. Each call is isolated so one missing getter does not kill the row.
+    The curve has no ethReserve()/totalRaised() getters; reserves come from getReserves() (virtual, wei scale)."""
+    curve = addr(curve)
+    out = {'graduated': None, 'ethReserve': None, 'tokenReserve': None, 'graduationThreshold': None, 'balanceWei': None, 'priceEth': None}
+    try: out['graduated'] = bool(call(curve, 'graduated()', returns=['bool'])[0])
+    except Exception: pass
+    try: out['ethReserve'], out['tokenReserve'] = call(curve, 'getReserves()', returns=['uint256', 'uint256'])
+    except Exception: pass
+    try: out['graduationThreshold'] = call(curve, 'graduationThreshold()', returns=['uint256'])[0]
+    except Exception: pass
+    try: out['balanceWei'] = int(rpc('eth_getBalance',[curve,'latest']),16)
+    except Exception: pass
+    # spot price in ETH per whole token: ratio of the two virtual reserves
+    if out['ethReserve'] and out['tokenReserve']: out['priceEth'] = out['ethReserve'] / out['tokenReserve']
     return out
 
 def erc20(token):
@@ -186,29 +192,87 @@ def launch_tx(form):
     data = calldata('launchToken(' + PARAM_TUPLE + ',uint256,address)', [PARAM_TUPLE, 'uint256', 'address'], [params, 0, ZERO])
     return {'tx':{'to':to_checksum_address(PONS),'data':data,'value':hex(launch_fee()),'chainId':CHAIN_ID},'creatorFeeRecipient':t,'creatorTaxBps':CREATOR_TAX_BPS,'model':model,'salt':'0x'+salt.hex()}
 
+def _reserves(curve):
+    e, t = call(curve, 'getReserves()', returns=['uint256','uint256'])
+    return int(e), int(t)
 def quote(token, side, amount, sender):
+    """Constant product on the curve's virtual reserves, 300 bps taken from the ETH side. Buy is confirmed against an eth_call simulation when possible."""
     info = launched(token); sender = addr(sender)
     if side not in ('buy','sell') or not re.fullmatch(r'[1-9][0-9]{0,77}', str(amount)): raise ValueError('Use a valid side and a positive wei amount.')
     if call(info['curve'],'graduated()',returns=['bool'])[0]: raise ChainError('This token has graduated to the pool. Trade it on the DEX.')
-    n = int(amount); tx = {'from':sender,'to':info['curve']}
-    if side == 'buy': tx.update(data=calldata('buy(uint256)',['uint256'],[0]), value=hex(n))
+    n = int(amount); e, t = _reserves(info['curve']); k = e * t
+    requires = False
+    if side == 'buy':
+        net = n * (10000 - FEE_BPS_TOTAL) // 10000
+        out = t - k // (e + net)
+        try:
+            sim = rpc('eth_call',[{'from':sender,'to':info['curve'],'data':calldata('buy(uint256,uint256,address)',['uint256','uint256','address'],[n,0,sender]),'value':hex(n)},'latest'])
+            if sim and sim != '0x': out = decode(['uint256'], bytes.fromhex(sim[2:]))[0]
+        except Exception: pass
     else:
-        allowance = call(info['token'],'allowance(address,address)',['address','address'],[sender,info['curve']])[0]
-        if allowance < n: return {'side':side,'amountInWei':str(n),'amountOutWei':None,'requiresApproval':True,'curve':info['curve'],'token':info['token'],'chainId':CHAIN_ID}
-        tx.update(data=calldata('sell(uint256,uint256)',['uint256','uint256'],[n,0]))
-    out = decode(['uint256'], bytes.fromhex(rpc('eth_call',[tx,'latest'])[2:]))[0]
-    return {'side':side,'amountInWei':str(n),'amountOutWei':str(out),'requiresApproval':False,'curve':info['curve'],'token':info['token'],'chainId':CHAIN_ID,'quotedAt':int(time.time())}
+        gross = e - k // (t + n)
+        out = gross * (10000 - FEE_BPS_TOTAL) // 10000
+        try: requires = call(info['token'],'allowance(address,address)',['address','address'],[sender,info['curve']])[0] < n
+        except Exception: requires = True
+    return {'side':side,'amountInWei':str(n),'amountOutWei':str(out),'priceEth':(e / t) if t else None,'feeBpsTotal':FEE_BPS_TOTAL,'requiresApproval':requires,
+            'curve':info['curve'],'token':info['token'],'chainId':CHAIN_ID,'quotedAt':int(time.time())}
 
 def trade_tx(form):
     side = form.get('side'); amount = str(form.get('amountWei','')); sender = addr(form.get('sender','')); bps = form.get('slippageBps')
     if not isinstance(bps,int) or isinstance(bps,bool) or not 10 <= bps <= 1000: raise ValueError('Slippage must be between 0.1% and 10%.')
     q = quote(str(form.get('token','')), side, amount, sender)
-    if q['requiresApproval']:
-        return {'approval':{'to':q['token'],'data':calldata('approve(address,uint256)',['address','uint256'],[q['curve'],int(amount)]),'value':'0x0','chainId':CHAIN_ID}}
     minimum = int(q['amountOutWei']) * (10000 - bps) // 10000
     if minimum == 0: raise ValueError('Output too small.')
-    data = calldata('buy(uint256)',['uint256'],[minimum]) if side == 'buy' else calldata('sell(uint256,uint256)',['uint256','uint256'],[int(amount),minimum])
-    return {'tx':{'to':q['curve'],'data':data,'value':hex(int(amount)) if side=='buy' else '0x0','chainId':CHAIN_ID},'quote':q,'minOutWei':str(minimum)}
+    n = int(amount)
+    if side == 'buy': data, value = calldata('buy(uint256,uint256,address)',['uint256','uint256','address'],[n,minimum,sender]), hex(n)
+    else: data, value = calldata('sell(uint256,uint256,address)',['uint256','uint256','address'],[n,minimum,sender]), '0x0'
+    out = {'tx':{'to':q['curve'],'data':data,'value':value,'chainId':CHAIN_ID},'quote':q,'minOutWei':str(minimum)}
+    if q['requiresApproval']: out['approval'] = {'to':q['token'],'data':calldata('approve(address,uint256)',['address','uint256'],[q['curve'],n]),'value':'0x0','chainId':CHAIN_ID}
+    return out
+
+_ts_cache = {}
+def block_timestamp(block):
+    b = int(block)
+    if b not in _ts_cache:
+        blk = rpc('eth_getBlockByNumber',[hex(b), False])
+        _ts_cache[b] = int(blk['timestamp'],16) if blk else int(time.time())
+        if len(_ts_cache) > 5000: _ts_cache.clear()
+    return _ts_cache[b]
+
+def trade_logs(curve, from_block, to_block='latest'):
+    """Buy and Sell events emitted by the curve. BUY data = [ethIn, tokensOut, protocolFee, creatorFee]; SELL data = [tokensIn, ethOut, protocolFee, creatorFee]."""
+    logs = rpc('eth_getLogs',[{'fromBlock':hex(int(from_block)),'toBlock':to_block if isinstance(to_block,str) else hex(int(to_block)),'address':addr(curve),'topics':[TRADE_TOPICS]}])
+    out = []
+    for l in logs:
+        d = l['data'][2:]; w = [int(d[i:i+64],16) for i in range(0, len(d), 64)]
+        if len(w) < 4 or len(l['topics']) < 3: continue
+        buy = l['topics'][0].lower() == BUY_TOPIC
+        out.append({'side':'buy' if buy else 'sell','caller':to_checksum_address('0x'+l['topics'][1][-40:]),'trader':to_checksum_address('0x'+l['topics'][2][-40:]),
+                    'ethWei':str(w[0] if buy else w[1]),'tokenWei':str(w[1] if buy else w[0]),'protocolFeeWei':str(w[2]),'creatorFeeWei':str(w[3]),
+                    'tx':l['transactionHash'],'block':int(l['blockNumber'],16),'logIndex':int(l['logIndex'],16)})
+    return out
+
+def launch_logo(txhash):
+    """Logo URI from the launch tx params tuple; ipfs:// is mapped to a public gateway. Empty string when it cannot be decoded."""
+    try:
+        tx = rpc('eth_getTransactionByHash',[txhash]); inp = bytes.fromhex(tx['input'][2:])
+        for off in (4, 36, 68):
+            try:
+                params = decode([PARAM_TUPLE], inp[off:])[0]; logo = str(params[2]).strip()
+                if logo.startswith('ipfs://'): logo = 'https://ipfs.io/ipfs/' + logo[7:].lstrip('/')
+                return logo if logo.startswith('https://') else ''
+            except Exception: continue
+    except Exception: pass
+    return ''
+
+def avatar_svg(symbol, address):
+    h = (address or '0x').lower().replace('0x','').ljust(12,'0')
+    h1 = int(h[0:3],16) % 360; h2 = (h1 + 40 + int(h[3:6],16) % 120) % 360
+    text = ''.join(ch for ch in str(symbol or '?').upper() if ch.isalnum())[:3] or '?'
+    size = 72 if len(text) <= 2 else 54
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+            f'<stop offset="0" stop-color="hsl({h1},70%,55%)"/><stop offset="1" stop-color="hsl({h2},70%,40%)"/></linearGradient></defs>'
+            f'<rect width="160" height="160" rx="36" fill="url(#g)"/><text x="80" y="80" dy=".36em" text-anchor="middle" font-family="system-ui,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="{size}" fill="#fff">{text}</text></svg>')
 
 def treasury_balance():
     t = treasury()

@@ -94,6 +94,13 @@ class H(BaseHTTPRequestHandler):
         if p == 'treasury/claim': return self.send(200, chain.claim_tx(q.get('from')))
         if p == 'models': return self.send(200, {'models': MODELS.MODELS, 'usage': pool.model_usage()})
         if p == 'tokens': return self.send(200, {'tokens': pool.token_list(sort=q.get('sort', 'new'), model=q.get('model'), status=q.get('status'), limit=int(q.get('limit', 50)))})
+        if p == 'trades': return self.send(200, {'trades': pool.on_chain_trades(token=q.get('token'), limit=min(int(q.get('limit', 100)), 500))})
+        if p == 'candles': return self.send(200, pool.candles(q.get('token', ''), interval_s=max(60, int(q.get('interval', 300))), limit=min(int(q.get('limit', 200)), 500)))
+        if p.startswith('token/') and p.endswith('/logo'):
+            rec = pool.TOKENS.get(p[6:-5].lower())
+            if rec and rec.get('logo'): return self.send(302, headers={'Location': rec['logo']}, body=b'')
+            svg = chain.avatar_svg(rec.get('symbol') if rec else None, p[6:-5])
+            return self.send(200, body=svg.encode(), ctype='image/svg+xml', headers={'Cache-Control': 'public, max-age=3600'})
         if p.startswith('token/'): return self.send(200, pool.token_detail(p[6:]))
         if p == 'live': return self.send(200, {'events': pool.live_feed(limit=int(q.get('limit', 60)), token=q.get('token'))})
         if p == 'takes': return self.send(200, {'takes': pool.takes(limit=int(q.get('limit', 60)), token=q.get('token'))})
