@@ -113,7 +113,11 @@ class H(BaseHTTPRequestHandler):
         if p == 'holders':
             rec = pool.TOKENS.get(q.get('token', '').lower())
             if not rec: return self.error(404, 'Unknown token.')
-            return self.send(200, holders.holders(rec['token'], rec, limit=min(int(q.get('limit', 50)), 200)))
+            out = holders.holders(rec['token'], rec, limit=min(int(q.get('limit', 50)), 200)); out['lastHolderBlock'] = rec.get('lastHolderBlock')
+            if q.get('probe'):
+                try: out['probe'] = {'launchBlockLogs': len(chain.transfer_logs(rec['token'], rec['block'], rec['block'])), 'reindexed': holders.index_holders(rec, int(rec['block']) + 10, TOKENS_ref_not_needed=pool.TOKENS) if q.get('probe') == 'fix' else None}
+                except Exception as e: out['probe'] = {'error': repr(e)}
+            return self.send(200, out)
         if p in ('persona', 'persona/history', 'memory'):
             rec = pool.TOKENS.get(q.get('token', '').lower())
             if not rec: return self.error(404, 'Unknown token.')
