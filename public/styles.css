@@ -159,7 +159,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .tabs a,.tabs button{height:38px;padding:0 22px;border:0;border-radius:999px;background:transparent;font-family:var(--head);font-weight:500;font-size:15px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}
 .tabs .active,.tabs a.active,.tabs button.active{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}
 .kbd{padding:2px 6px;border-radius:6px;background:var(--wash);font-size:12px}
-.copy{cursor:pointer;padding:2px 8px;border-radius:8px;background:var(--wash);transition:background .4s var(--ease)}.copy:hover{background:var(--blue-soft);color:var(--blue-deep)}
+.copy{cursor:pointer;border:0;appearance:none;font:inherit;font-family:var(--mono);font-size:.85em;color:var(--muted);line-height:1.4;padding:3px 10px;border-radius:999px;background:var(--wash);transition:background .4s var(--ease)}.copy:hover{background:var(--blue-soft);color:var(--blue-deep)}
 .empty{padding:48px 24px;text-align:center;color:var(--muted);border-radius:24px;background:var(--bg-2)}
 .skeleton{position:relative;overflow:hidden;color:transparent!important;background:var(--wash-1)!important;border-radius:12px}
 .skeleton:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);animation:shimmer 1.4s linear infinite}
