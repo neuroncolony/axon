@@ -123,9 +123,12 @@ def enrich(rec, px=None, ts=None):
             'graduation': thr, 'status': 'Graduated' if rec.get('phase') == 2 or cs.get('graduated') else 'Curve',
             'age': store.now() - rec.get('launchedAt', store.now()), 'modelName': M.BY_ID.get(rec.get('model') or '', {}).get('name'),
             'explorer': chain.EXPLORER + '/address/' + rec['token'], 'volume24hUsd': vol * px, 'trades24h': n}
+def _ours():
+    t = (chain.treasury() or '').lower()
+    return [r for r in TOKENS.values() if t and (r.get('creatorFeeRecipient') or '').lower() == t]
 def token_list(sort='new', model=None, status=None, limit=50):
     px = eth_usd(); ts = _trade_stats()
-    rows = [enrich(r, px, ts) for r in TOKENS.values()]
+    rows = [enrich(r, px, ts) for r in _ours()]
     if model: rows = [r for r in rows if r.get('model') == model]
     if status: rows = [r for r in rows if r['status'].lower() == status.lower()]
     key = {'mcap': lambda r: -(r.get('marketCapUsd') or 0), 'volume': lambda r: -(r.get('volume24hUsd') or 0), 'graduation': lambda r: -(r.get('graduation') or 0)}.get(sort, lambda r: -r.get('launchedAt', 0))
@@ -171,7 +174,7 @@ def stats():
             'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(TOKENS), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
 def model_usage():
     counts = {}
-    for r in TOKENS.values():
+    for r in _ours():
         if r.get('model'): counts[r['model']] = counts.get(r['model'], 0) + 1
     return {'launches': counts, 'spentUsd': LEDGER['byModel']}
 def leaderboard(by='mcap'):
@@ -193,14 +196,14 @@ def scoreboard():
 def offspring():
     """An offspring is a token launched by a wallet that had already launched an axon token. Lineage is derived from chain order, not declared."""
     first = {}
-    for r in sorted(TOKENS.values(), key=lambda r: r.get('block') or 0): first.setdefault(r['deployer'].lower(), r)
+    for r in sorted(_ours(), key=lambda r: r.get('block') or 0): first.setdefault(r['deployer'].lower(), r)
     px = eth_usd(); ts = _trade_stats()
-    out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in TOKENS.values() if first[r['deployer'].lower()]['token'] != r['token']]
+    out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in _ours() if first[r['deployer'].lower()]['token'] != r['token']]
     return sorted(out, key=lambda o: -o['child'].get('launchedAt', 0))
 
 # ------------------------------------------------------------------ entitlement + chat
 def entitlement(address):
-    a = address.lower(); owned = [r for r in TOKENS.values() if r['deployer'].lower() == a]
+    a = address.lower(); owned = [r for r in _ours() if r['deployer'].lower() == a]
     return {'hasLaunched': bool(owned), 'launches': [{'token': r['token'], 'symbol': r.get('symbol'), 'model': r.get('model')} for r in owned],
             'spentUsd': LEDGER['byAddress'].get(a, 0.0), 'chatEnabled': chat_enabled()}
 def _bill(address, model, usage):
@@ -275,7 +278,7 @@ def run_agents(max_tokens=1):
     """One round: post a take, settle bets older than 24h, place a new call. Billed to the launcher like any message."""
     if not chat_enabled(): return {'skipped': 'no compute'}
     done = []
-    for rec in sorted([r for r in TOKENS.values() if r.get('model')], key=lambda r: r.get('lastTakeAt', 0))[:max_tokens]:
+    for rec in sorted([r for r in _ours() if r.get('model')], key=lambda r: r.get('lastTakeAt', 0))[:max_tokens]:
         if store.now() - rec.get('lastTakeAt', 0) < 20 * 3600: continue
         try:
             e = enrich(rec); settle_bets(rec, e)
