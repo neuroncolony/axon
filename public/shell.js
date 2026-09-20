@@ -118,7 +118,14 @@ window.AXON = (() => {
     }); }
     for (const b of document.querySelectorAll('[data-connect]')) b.addEventListener('click', () => openWalletModal().catch(e => e.message !== 'Cancelled.' && toast(e.message)));
     for (const b of document.querySelectorAll('[data-acct]')) b.addEventListener('click', () => { if (confirm('Disconnect this wallet from the page?')) { state.provider = null; state.address = null; session = null; localStorage.removeItem('axon.wallet'); api('auth/logout', {}).catch(()=>{}); renderNav(); } });
-    $('#burger')?.addEventListener('click', () => $('#navm').classList.toggle('open'));
+    const burger = $('#burger'), navm = $('#navm');
+    if (burger && navm) {
+      const place = () => { const r = burger.getBoundingClientRect(); navm.style.top = (r.bottom + 8) + 'px'; navm.style.right = Math.max(12, innerWidth - r.right) + 'px'; };
+      burger.addEventListener('click', e => { e.stopPropagation(); place(); navm.classList.toggle('open'); });
+      document.addEventListener('click', e => { if (navm.classList.contains('open') && !navm.contains(e.target)) navm.classList.remove('open'); });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') navm.classList.remove('open'); });
+      addEventListener('resize', () => { if (navm.classList.contains('open')) place(); }, { passive: true });
+    }
     const f = $('#footer'); if (f) f.innerHTML = `<div class="wrap"><div class="fgrid"><div><a class="brand" href="${href('/')}"><span class="mark"></span>${BRAND.name}</a><p class="ftxt">Every trade fires a thought. Tokens on pons v2, Robinhood Chain. Inference through OpenRouter.</p><p class="ftxt"><a class="mono" href="${CHAIN.explorer}/address/0x7eD598BcEf8bd9Edd8C97A195C6d13f40801EC7e" target="_blank" rel="noopener">factory 0x7eD598Bc…EC7e</a></p></div><div><p class="eyebrow">Product</p><div class="flinks"><a href="${href('/launch')}">Launch a coin</a><a href="${href('/explore')}">Markets</a><a href="${href('/live')}">Live</a><a href="${href('/explore')}?view=compare">Compare</a><a href="${href('/leaderboard')}">Leaderboards</a></div></div><div><p class="eyebrow">Under the hood</p><div class="flinks"><a href="${href('/docs')}">Notes</a><a href="${href('/takes')}">Agora</a><a href="${href('/offspring')}">Offspring</a><a href="${CHAIN.explorer}" target="_blank" rel="noopener">Explorer</a></div></div></div><div class="fbottom"><span>${BRAND.name} runs on chain ${CHAIN.id}. Tokens are experiments, not investments.</span><span class="mono">pons v2 · Robinhood Chain</span></div></div>`;
   }
   async function autoReconnect() {
