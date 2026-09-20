@@ -52,8 +52,8 @@ window.AXON = (() => {
   function openWalletModal() {
     return new Promise((resolve, reject) => {
       const list = providers(); const m = document.createElement('div'); m.className='modal';
-      m.innerHTML = `<div class="card"><div class="section-head" style="margin-bottom:.25rem"><h2>Connect a wallet</h2><button class="copy" data-x>close</button></div><p class="muted" style="margin:.25rem 0 0;font-size:.85rem">Robinhood Chain (${CHAIN.id}). Nothing is signed until you approve it in your wallet.</p><div class="wallet-list">${list.length ? list.map((w,i)=>`<button data-i="${i}">${w.info.icon?`<img src="${esc(w.info.icon)}" alt="">`:''}<span>${esc(w.info.name)}</span></button>`).join('') : '<div class="empty">No browser wallet detected. Install MetaMask, Rabby or another EIP-1193 wallet.</div>'}</div></div>`;
-      m.onclick = async e => { if (e.target === m || e.target.dataset.x !== undefined) { m.remove(); reject(Error('Cancelled.')); return; } const b = e.target.closest('[data-i]'); if (!b) return; try { await connectWith(list[+b.dataset.i]); m.remove(); resolve(); } catch (err) { toast(err.message); } };
+      m.innerHTML = `<div class="card modal-card"><button class="modal-x" data-x aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></button><h2 class="modal-title">Connect a wallet</h2><div class="wallet-list">${list.length ? list.map((w,i)=>`<button data-i="${i}">${w.info.icon?`<img src="${esc(w.info.icon)}" alt="">`:''}<span>${esc(w.info.name)}</span></button>`).join('') : '<div class="empty">No browser wallet detected. Install MetaMask, Rabby or another EIP-1193 wallet.</div>'}</div></div>`;
+      m.onclick = async e => { if (e.target === m || e.target.closest('[data-x]')) { m.remove(); reject(Error('Cancelled.')); return; } const b = e.target.closest('[data-i]'); if (!b) return; try { await connectWith(list[+b.dataset.i]); m.remove(); resolve(); } catch (err) { toast(err.message); } };
       document.body.appendChild(m);
     });
   }

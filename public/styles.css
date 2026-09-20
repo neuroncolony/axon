@@ -176,7 +176,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 /* toast + modal */
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:100;padding:12px 18px;border-radius:16px;background:var(--ink);color:#fff;font-size:14px;box-shadow:var(--chip-gloss),0 20px 40px -20px rgba(11,26,51,.5);animation:pop .4s var(--spring)}
 .modal{position:fixed;inset:0;z-index:95;display:grid;place-items:center;padding:20px;background:rgba(11,26,51,.32);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:fade .3s var(--ease)}
-.modal>div{width:100%;max-width:420px;padding:24px;border-radius:24px;background:#fff;box-shadow:var(--shadow);animation:rise .4s var(--spring)}
+.modal>div{position:relative;width:100%;max-width:420px;padding:24px;border-radius:24px;background:#fff;box-shadow:var(--shadow);animation:rise .4s var(--spring)}
 .modal h3{margin-bottom:12px}
 .wallet-list{display:grid;gap:8px}
 .wallet-list button{display:flex;align-items:center;gap:12px;height:52px;padding:0 16px;border:0;border-radius:16px;background:var(--wash-1);box-shadow:0 0 0 1px var(--line);font-family:var(--head);font-weight:500;font-size:16px;cursor:pointer;transition:background .4s var(--ease),transform .4s var(--ease)}
@@ -324,3 +324,19 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .xsel-menu::-webkit-scrollbar-thumb:hover{background:var(--muted-2);background-clip:content-box;border:3px solid transparent}
 
 @supports not ((backdrop-filter:blur(4px)) or (-webkit-backdrop-filter:blur(4px))){.nav[data-stuck] .pill,.nav-mobile{background:rgba(255,255,255,.95)}}
+
+.modal-card{padding:26px 24px 24px}
+.modal-title{margin:0 44px 16px 0;font-family:var(--head);font-weight:600;font-size:26px;letter-spacing:-.015em;line-height:1.15;color:var(--ink)}
+.modal-x{position:absolute;top:16px;right:16px;display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:999px;background:var(--wash-1);color:var(--muted);cursor:pointer;transition:background .3s var(--ease),color .3s var(--ease),transform .3s var(--ease)}
+.modal-x:hover{background:var(--blue-soft);color:var(--blue-deep)}
+.modal-x:active{transform:scale(.92)}
+.modal-x:focus-visible{outline:0;box-shadow:0 0 0 2px var(--blue-ring)}
+.modal-x svg{pointer-events:none}
+/* clean scrollbars site wide: no arrow buttons, no track chrome */
+*{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-button{display:none;width:0;height:0}
+::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:var(--muted-2);background-clip:content-box}
