@@ -297,3 +297,27 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .nav-links{position:relative}.nav-links a:after{display:none}
 .nav-ind{position:absolute;bottom:2px;height:2px;border-radius:2px;background:var(--blue);left:0;width:0;opacity:0;transition:left .45s var(--ease),width .45s var(--ease),opacity .3s var(--ease);pointer-events:none}
 .nav-ind.on{opacity:1}
+/* themed select: native popup replaced by an in page listbox with a clean scrollbar */
+.xsel{position:relative;display:block}
+.xsel.inline{display:inline-block}
+.xsel>select{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;appearance:none;-webkit-appearance:none}
+.xsel-btn{display:flex;align-items:center;gap:10px;width:100%;height:48px;padding:0 40px 0 16px;border:0;border-radius:16px;background:var(--wash-1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%230b1a33' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 16px center;box-shadow:0 0 0 1px var(--line);color:var(--ink);font:inherit;text-align:left;cursor:pointer;outline:0;transition:box-shadow .3s var(--ease),background .3s var(--ease)}
+.xsel-btn:hover{background-color:var(--wash)}
+.xsel.open>.xsel-btn,.xsel-btn:focus-visible{background-color:#fff;box-shadow:0 0 0 2px var(--blue-ring)}
+.xsel-btn .xsel-val{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xsel.sm .xsel-btn{height:40px;padding:0 36px 0 14px;border-radius:14px;background-position:right 14px center;font-family:var(--head);font-weight:500;font-size:15px}
+.xsel-menu{position:absolute;z-index:80;left:0;right:0;top:calc(100% + 8px);max-height:296px;overflow:auto;overscroll-behavior:contain;padding:6px;border-radius:18px;background:var(--panel-a);box-shadow:var(--shadow),0 24px 48px -28px rgba(11,26,51,.35);opacity:0;transform:translateY(-6px) scale(.985);transform-origin:top center;pointer-events:none;transition:opacity .18s var(--ease),transform .22s var(--ease);mask-image:linear-gradient(#000,#000 calc(100% - 22px),transparent);-webkit-mask-image:linear-gradient(#000,#000 calc(100% - 22px),transparent)}
+.xsel.up .xsel-menu{mask-image:linear-gradient(transparent,#000 22px,#000);-webkit-mask-image:linear-gradient(transparent,#000 22px,#000)}
+.xsel.up .xsel-menu{top:auto;bottom:calc(100% + 8px);transform-origin:bottom center}
+.xsel.open .xsel-menu{opacity:1;transform:none;pointer-events:auto}
+.xsel-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:15px;color:var(--ink-80);cursor:pointer;transition:background .16s var(--ease),color .16s var(--ease)}
+.xsel-opt small{margin-left:auto;color:var(--faint);font-size:12px}
+.xsel-opt:hover,.xsel-opt.cursor{background:var(--wash-1);color:var(--ink)}
+.xsel-opt[aria-selected="true"]{background:var(--blue-soft);color:var(--blue-deep);font-weight:600}
+.xsel-opt[aria-selected="true"] small{color:var(--blue-deep);opacity:.7}
+.xsel-group{padding:12px 12px 6px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.xsel-menu{scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+.xsel-menu::-webkit-scrollbar{width:10px}
+.xsel-menu::-webkit-scrollbar-track{background:transparent;margin:8px 0}
+.xsel-menu::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:999px;border:3px solid transparent;background-clip:content-box}
+.xsel-menu::-webkit-scrollbar-thumb:hover{background:var(--muted-2);background-clip:content-box;border:3px solid transparent}

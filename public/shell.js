@@ -166,6 +166,80 @@ window.AXON = (() => {
     }
     document.addEventListener('DOMContentLoaded',()=>{ setTimeout(tick,1500); setInterval(tick,10000); });
   })();
-  document.addEventListener('DOMContentLoaded', () => { renderNav(); autoReconnect(); });
-  return { BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, openWalletModal, ensureChain, sendTx, login, me, renderNav };
+
+  /* themed dropdowns: keeps the native <select> as the source of truth, paints an in page listbox so the scrollbar is ours */
+  function fancySelect(sel){
+    if(sel.dataset.xsel||sel.multiple||sel.size>1) return;
+    sel.dataset.xsel='1';
+    const wrap=document.createElement('div');
+    wrap.className='xsel'+(sel.classList.contains('sel')?' sm inline':'');
+    sel.parentNode.insertBefore(wrap,sel); wrap.appendChild(sel);
+    const btn=document.createElement('button'); btn.type='button'; btn.className='xsel-btn';
+    btn.setAttribute('aria-haspopup','listbox'); btn.setAttribute('aria-expanded','false');
+    btn.innerHTML='<span class="xsel-val"></span>';
+    const menu=document.createElement('div'); menu.className='xsel-menu'; menu.setAttribute('role','listbox');
+    wrap.appendChild(btn); wrap.appendChild(menu);
+    let cursor=-1;
+    const opts=()=>Array.from(sel.options);
+    function paint(){
+      const cur=sel.selectedIndex;
+      btn.querySelector('.xsel-val').textContent = cur>=0 ? sel.options[cur].text : '';
+      menu.innerHTML='';
+      opts().forEach((o,i)=>{
+        const row=document.createElement('div');
+        row.className='xsel-opt'; row.setAttribute('role','option');
+        row.setAttribute('aria-selected', i===cur?'true':'false');
+        row.dataset.i=i;
+        const t=o.text; const mt=t.match(/^(.*)\s\(([^()]+)\)$/);
+        row.innerHTML = mt ? `<span>${esc(mt[1])}</span><small>${esc(mt[2])}</small>` : `<span>${esc(t)}</span>`;
+        if(o.disabled) row.style.opacity='.45';
+        menu.appendChild(row);
+      });
+    }
+    function moveCursor(i){
+      const rows=Array.from(menu.children); if(!rows.length) return;
+      cursor=Math.max(0,Math.min(rows.length-1,i));
+      rows.forEach((r,n)=>r.classList.toggle('cursor',n===cursor));
+      rows[cursor].scrollIntoView({block:'nearest'});
+    }
+    function open(){
+      if(wrap.classList.contains('open')) return;
+      paint();
+      const below=window.innerHeight-wrap.getBoundingClientRect().bottom;
+      wrap.classList.toggle('up', below<260);
+      wrap.classList.add('open'); btn.setAttribute('aria-expanded','true');
+      moveCursor(Math.max(0,sel.selectedIndex));
+      const cur=menu.querySelector('[aria-selected="true"]'); if(cur) cur.scrollIntoView({block:'center'});
+    }
+    function close(){ wrap.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }
+    function choose(i){
+      if(i<0||i>=sel.options.length||sel.options[i].disabled) return;
+      if(sel.selectedIndex!==i){ sel.selectedIndex=i; sel.dispatchEvent(new Event('input',{bubbles:true})); sel.dispatchEvent(new Event('change',{bubbles:true})); }
+      paint(); close(); btn.focus();
+    }
+    btn.addEventListener('click',e=>{ e.preventDefault(); wrap.classList.contains('open')?close():open(); });
+    menu.addEventListener('mousedown',e=>e.preventDefault());
+    menu.addEventListener('click',e=>{ const r=e.target.closest('.xsel-opt'); if(r) choose(+r.dataset.i); });
+    btn.addEventListener('keydown',e=>{
+      const isOpen=wrap.classList.contains('open');
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(!isOpen){ open(); return; } moveCursor(cursor+(e.key==='ArrowDown'?1:-1)); }
+      else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); isOpen?choose(cursor):open(); }
+      else if(e.key==='Escape'&&isOpen){ e.preventDefault(); close(); }
+      else if(e.key==='Home'&&isOpen){ e.preventDefault(); moveCursor(0); }
+      else if(e.key==='End'&&isOpen){ e.preventDefault(); moveCursor(sel.options.length-1); }
+      else if(isOpen&&e.key.length===1){ const q=e.key.toLowerCase(); const i=opts().findIndex(o=>o.text.toLowerCase().startsWith(q)); if(i>=0) moveCursor(i); }
+    });
+    document.addEventListener('click',e=>{ if(!wrap.contains(e.target)) close(); });
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+    window.addEventListener('resize',close);
+    new MutationObserver(()=>paint()).observe(sel,{childList:true,subtree:true,attributes:true,attributeFilter:['value']});
+    sel.addEventListener('change',paint);
+    const desc=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+    try{ Object.defineProperty(sel,'value',{get(){return desc.get.call(sel);},set(v){ desc.set.call(sel,v); paint(); },configurable:true}); }catch(_){}
+    paint();
+  }
+  function fancySelects(root){ (root||document).querySelectorAll('select:not([data-xsel]):not([data-plain])').forEach(fancySelect); }
+
+  document.addEventListener('DOMContentLoaded', () => { renderNav(); autoReconnect(); fancySelects(); new MutationObserver(()=>fancySelects()).observe(document.body,{childList:true,subtree:true}); });
+  return { BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, fancySelects, openWalletModal, ensureChain, sendTx, login, me, renderNav };
 })();

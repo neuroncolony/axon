@@ -1,8 +1,8 @@
 {
   "name": "axon",
   "displayName": "Axon",
-  "tagline": "Tokens with a spend.",
-  "description": "Launch a token that backs an AI model. Two percent of every trade is pooled into shared compute, and anyone who has launched can spend it talking to any model on the platform.",
+  "tagline": "Every trade buys thinking.",
+  "description": "Launch a token, pick the model it backs, and 2 percent of every trade pools into shared compute. Anyone who has launched can spend that pool talking to any model on the platform.",
   "domain": "axon.local",
   "twitter": "",
   "telegram": "",
