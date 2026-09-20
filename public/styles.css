@@ -195,6 +195,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .fgrid .eyebrow{color:var(--ink);margin-bottom:10px}
 .ftxt{margin:0;font-size:14px;line-height:1.5}.ftxt a{color:var(--ink)}
 .flinks{display:grid;gap:8px}.flinks a{font-family:var(--head);font-size:16px;font-weight:500;color:var(--ink-80)}.flinks a:hover{color:var(--ink)}
+.f-x{display:inline-flex;align-items:center;gap:4px}
 .fbottom{margin-top:56px;padding-top:24px;border-top:1px solid var(--line);font-size:13px;color:var(--faint);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 /* motion */
 @keyframes appear-head{to{opacity:1;transform:none}}
