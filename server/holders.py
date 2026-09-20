@@ -7,7 +7,8 @@ import chain, store
 from eth_utils import to_checksum_address
 
 ZERO = '0x' + '0' * 40
-CHUNK = 5000
+CHUNK = 1000
+MAX_CHUNKS_PER_PASS = 60
 
 def index_holders(rec, head, TOKENS_ref_not_needed=None):
     """Advance rec['lastHolderBlock'] for one token in 5000 block chunks from rec['block'],
@@ -22,9 +23,17 @@ def index_holders(rec, head, TOKENS_ref_not_needed=None):
     if start > head: return 0
     applied = 0
     try:
+        budget = MAX_CHUNKS_PER_PASS
         for a in range(start, head + 1, CHUNK):
             end = min(a + CHUNK - 1, head)
-            for t in chain.transfer_logs(token, a, hex(end)):
+            if budget <= 0: break
+            budget -= 1
+            try: logs = chain.transfer_logs(token, a, hex(end))
+            except Exception as e:
+                # some RPCs cap eth_getLogs ranges; retry this chunk in small slices before giving up
+                print('holder chunk retry', rec.get('symbol'), a, end, repr(e), flush=True); logs = []
+                for sa in range(a, end + 1, 250): logs += chain.transfer_logs(token, sa, hex(min(sa + 249, end)))
+            for t in logs:
                 frm, to = t['from'].lower(), t['to'].lower()
                 v = int(t['valueWei'])
                 if frm != ZERO:
@@ -40,9 +49,8 @@ def index_holders(rec, head, TOKENS_ref_not_needed=None):
             rec['lastHolderBlock'] = end
     except Exception as e:
         print('holder index', rec.get('symbol'), repr(e), flush=True)
-    if applied:
-        store.save('holders')
-        if TOKENS_ref_not_needed is not None and key in TOKENS_ref_not_needed: store.save('tokens')
+    if applied: store.save('holders')
+    if TOKENS_ref_not_needed is not None and key in TOKENS_ref_not_needed: store.save('tokens')
     return applied
 
 def holders(token, rec, limit=50):
