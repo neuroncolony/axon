@@ -16,11 +16,14 @@ def chat_enabled(): return bool(or_key()) and bool(chain.treasury())
 
 _eth = {'usd': None, 'at': 0}
 def eth_usd():
-    if time.time() - _eth['at'] < 120 and _eth['usd']: return _eth['usd']
+    # Success is cached 120s. A failed fetch is also remembered for 30s so a rate-limited CoinGecko
+    # does not cost one 10s timeout per token row.
+    if time.time() - _eth['at'] < (120 if _eth['usd'] else 30): return _eth['usd']
     try:
-        r = proxied_get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', headers=CALLER, timeout=10)
-        _eth['usd'] = float(r.json()['ethereum']['usd']); _eth['at'] = time.time()
+        r = proxied_get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd', headers=CALLER, timeout=6)
+        _eth['usd'] = float(r.json()['ethereum']['usd'])
     except Exception: pass
+    _eth['at'] = time.time()
     return _eth['usd']
 
 TOKENS = store.load('tokens', {})
@@ -83,8 +86,18 @@ def start_indexer():
     threading.Thread(target=loop, daemon=True).start()
 
 # ------------------------------------------------------------------ views
-def enrich(rec):
-    px = eth_usd() or 0; cs = rec.get('curveState') or {}; thr = None
+def _trade_stats(evs=None):
+    """One pass over the events file: {token: (volume_eth_24h, trades_24h)}. Pass the result to enrich() when building lists."""
+    cut = store.now() - 86400; out = {}
+    for e in (evs if evs is not None else events()):
+        if e.get('type') == 'trade' and e.get('at', 0) > cut:
+            v, n = out.get(e.get('token'), (0.0, 0)); out[e.get('token')] = (v + float(e.get('ethValue', 0)), n + 1)
+    return out
+def enrich(rec, px=None, ts=None):
+    px = eth_usd() if px is None else px; px = px or 0
+    if ts is None: ts = _trade_stats()
+    vol, n = ts.get(rec['token'], (0.0, 0))
+    cs = rec.get('curveState') or {}; thr = None
     try:
         raised = int(cs.get('totalRaised') or cs.get('balanceWei') or 0); target = int(cs.get('graduationThreshold') or 0)
         thr = min(1.0, raised / target) if target else None
@@ -93,9 +106,10 @@ def enrich(rec):
             'marketCapUsd': (rec.get('marketCapEth') or 0) * px if rec.get('marketCapEth') else None,
             'graduation': thr, 'status': 'Graduated' if rec.get('phase') == 2 or cs.get('graduated') else 'Curve',
             'age': store.now() - rec.get('launchedAt', store.now()), 'modelName': M.BY_ID.get(rec.get('model') or '', {}).get('name'),
-            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'volume24hUsd': volume24(rec['token']) * px, 'trades24h': trades24(rec['token'])}
+            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'volume24hUsd': vol * px, 'trades24h': n}
 def token_list(sort='new', model=None, status=None, limit=50):
-    rows = [enrich(r) for r in TOKENS.values()]
+    px = eth_usd(); ts = _trade_stats()
+    rows = [enrich(r, px, ts) for r in TOKENS.values()]
     if model: rows = [r for r in rows if r.get('model') == model]
     if status: rows = [r for r in rows if r['status'].lower() == status.lower()]
     key = {'mcap': lambda r: -(r.get('marketCapUsd') or 0), 'volume': lambda r: -(r.get('volume24hUsd') or 0), 'graduation': lambda r: -(r.get('graduation') or 0)}.get(sort, lambda r: -r.get('launchedAt', 0))
@@ -164,7 +178,8 @@ def offspring():
     """An offspring is a token launched by a wallet that had already launched an axon token. Lineage is derived from chain order, not declared."""
     first = {}
     for r in sorted(TOKENS.values(), key=lambda r: r.get('block') or 0): first.setdefault(r['deployer'].lower(), r)
-    out = [{'child': enrich(r), 'parent': enrich(first[r['deployer'].lower()])} for r in TOKENS.values() if first[r['deployer'].lower()]['token'] != r['token']]
+    px = eth_usd(); ts = _trade_stats()
+    out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in TOKENS.values() if first[r['deployer'].lower()]['token'] != r['token']]
     return sorted(out, key=lambda o: -o['child'].get('launchedAt', 0))
 
 # ------------------------------------------------------------------ entitlement + chat
