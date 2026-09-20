@@ -91,7 +91,7 @@ class H(BaseHTTPRequestHandler):
         s = self.session()
         if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled()})
         if p == 'stats': return self.send(200, pool.stats())
-        if p == 'treasury/claim': return self.send(200, chain.claim_tx())
+        if p == 'treasury/claim': return self.send(200, chain.claim_tx(q.get('from')))
         if p == 'models': return self.send(200, {'models': MODELS.MODELS, 'usage': pool.model_usage()})
         if p == 'tokens': return self.send(200, {'tokens': pool.token_list(sort=q.get('sort', 'new'), model=q.get('model'), status=q.get('status'), limit=int(q.get('limit', 50)))})
         if p.startswith('token/'): return self.send(200, pool.token_detail(p[6:]))

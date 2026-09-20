@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!AXON.state.address) { await AXON.openWalletModal(); return; }
       if ((AXON.state.address || '').toLowerCase() !== treasury) { AXON.toast('Connect the treasury wallet (' + shortAddr(treasury) + ') to claim.'); return; }
       claimBtn.disabled = true;
-      const res = await api('treasury/claim');
+      const res = await api('treasury/claim?from=' + encodeURIComponent(AXON.state.address));
       const { hash } = await sendTx(res.tx, res.tx.to);
       AXON.toast('Claim sent: ' + short(hash));
       claimBtn.textContent = 'Claim sent. Refreshing…';
