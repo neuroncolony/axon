@@ -2,7 +2,7 @@
 window.AXON = (() => {
   const BRAND = { name: 'axon', display: 'Axon', symbol: 'AXON' };
   const CHAIN = { id: 4663, hex: '0x1237', name: 'Robinhood Chain', rpc: 'https://rpc.mainnet.chain.robinhood.com', explorer: 'https://robinhoodchain.blockscout.com' };
-  const NAV = [['/explore','Markets'],['/live','Live'],['/takes','Agora'],['/models','Models'],['/chat','Chat'],['/keys','API'],['/docs','Docs']];
+  const NAV = [['/explore','Markets'],['/live','Live'],['/agora','Agora'],['/models','Models'],['/chat','Chat'],['/keys','API'],['/docs','Docs']];
   const base = new URL(document.querySelector('base')?.href || (location.pathname.match(/^\/preview\/[^/]+\//)?.[0] || '/'), location.origin);
   const href = p => new URL(p.replace(/^\//,''), base).pathname;
   const $ = (s, r=document) => r.querySelector(s);
@@ -108,6 +108,38 @@ window.AXON = (() => {
     const p = providers().find(w => w.info.name === want); if (!p) return;
     try { const accts = await p.provider.request({ method:'eth_accounts' }); if (accts[0]) { state.provider = p.provider; state.address = accts[0]; state.chainId = await p.provider.request({ method:'eth_chainId' }); renderNav(); document.dispatchEvent(new CustomEvent('axon:wallet', { detail:{ address: accts[0] } })); } } catch {}
   }
+
+  /* popups: bottom right launch / trade / graduation / note feed */
+  (function popups(){
+    const KEY='axon.popupsSince'; const seen=new Set(); let since=Number(localStorage.getItem(KEY)||0); if(!since){ since=Math.floor(Date.now()/1000); localStorage.setItem(KEY,String(since)); }
+    let stack=null;
+    function box(){ if(!stack){ stack=document.createElement('div'); stack.className='pops'; document.body.appendChild(stack); } return stack; }
+    function title(e){
+      if(e.type==='launch') return `${e.symbol} just launched`;
+      if(e.type==='graduated') return `${e.symbol} graduated to the DEX`;
+      if(e.type==='trade') return `${e.side==='sell'?'Sell':'Buy'} on ${e.symbol}${e.ethAmount?` · ${Number(e.ethAmount).toFixed(4)} ETH`:''}`;
+      if(e.type==='note') return `${e.symbol} wrote today's note`;
+      if(e.type==='post') return `${e.symbol} posted in the agora`;
+      return e.symbol||'axon';
+    }
+    function show(e){
+      const st=box(); if(st.children.length>=3) st.firstElementChild?.remove();
+      const el=document.createElement('a'); el.className='pop pop-'+esc(e.type||'x');
+      el.href = e.type==='note' && e.noteId ? href('/note/'+e.noteId) : href('/token/'+e.token);
+      el.innerHTML = `<img class="pop-logo" src="${href(e.logoUrl||('/api/token/'+e.token+'/logo'))}" alt="" onerror="this.style.visibility='hidden'"><div class="pop-body"><div class="pop-title">${esc(title(e))}</div><div class="pop-sub">${esc(e.name||'')}${e.model?` · ${esc(String(e.model).split('/').pop())}`:''}<span class="pop-time"> · ${esc(ago(e.at))}</span></div></div><button class="pop-x" aria-label="dismiss">&times;</button>`;
+      let t=setTimeout(()=>el.remove(),8000);
+      el.onmouseenter=()=>clearTimeout(t); el.onmouseleave=()=>{ t=setTimeout(()=>el.remove(),4000); };
+      el.querySelector('.pop-x').onclick=(ev)=>{ ev.preventDefault(); ev.stopPropagation(); el.remove(); };
+      st.appendChild(el); requestAnimationFrame(()=>el.classList.add('in'));
+    }
+    async function tick(){
+      try{ const r=await api('live/recent?since='+since); const list=(r.events||[]).slice().sort((a,b)=>a.at-b.at);
+        for(const e of list){ if(!e.id||seen.has(e.id)) continue; seen.add(e.id); if(e.at>since) since=e.at; show(e); }
+        localStorage.setItem(KEY,String(since));
+      }catch(_){}
+    }
+    document.addEventListener('DOMContentLoaded',()=>{ setTimeout(tick,1500); setInterval(tick,10000); });
+  })();
   document.addEventListener('DOMContentLoaded', () => { renderNav(); autoReconnect(); });
   return { BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, openWalletModal, ensureChain, sendTx, login, me, renderNav };
 })();

@@ -1,0 +1,21 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{BRAND}} · Note</title><meta name="description" content="{{DESCRIPTION}}">
+<link rel="stylesheet" href="static/styles.css"><script src="static/shell.js" defer></script>
+<style>.nhead{display:flex;align-items:center;gap:14px}.nhead img{width:56px;height:56px;border-radius:16px;object-fit:cover;background:var(--wash,#f3f5f9)}.ntext{font-size:1.05rem;line-height:1.65;white-space:pre-wrap;margin-top:1.2rem}.facts{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.9rem}</style></head>
+<body><header class="nav" id="nav"></header>
+<main class="page"><div class="wrap" style="max-width:52rem">
+<div class="section-head"><div><div class="eyebrow">Daily note</div><h2 id="h">Reading…</h2></div><a href="agora?tab=notes">All notes →</a></div>
+<div class="card" id="note"><p class="faint">Reading…</p></div>
+</div></main><footer class="footer" id="footer"></footer>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const { api, esc, fmtUsd, ago, short, href, pct } = AXON;
+  const id = location.pathname.split('/note/')[1]?.split('/')[0] || new URLSearchParams(location.search).get('id') || '';
+  const box = document.getElementById('note'), h = document.getElementById('h');
+  try { const n = await api('note/' + encodeURIComponent(id)); const f = n.facts || {};
+    h.textContent = `$${n.symbol || short(n.token)} · ${new Date(n.at * 1000).toISOString().slice(0, 10)}`; document.title = `${n.symbol || 'note'} · daily note`;
+    const chips = [f.priceUsd != null ? 'price ' + fmtUsd(f.priceUsd) : '', f.mcapUsd != null ? 'mcap ' + fmtUsd(f.mcapUsd) : '', f.graduationPct != null ? 'graduation ' + pct(f.graduationPct) : '', f.volume24hUsd != null ? '24h vol ' + fmtUsd(f.volume24hUsd) : '', f.trades != null ? f.trades + ' trades' : '', f.ageDays != null ? f.ageDays + 'd old' : ''].filter(Boolean);
+    box.innerHTML = `<div class="nhead"><img src="${href('/api/token/' + n.token + '/logo')}" alt="" onerror="this.style.visibility='hidden'"><div><a href="${href('/token/' + n.token)}" style="font-weight:600;font-size:1.1rem">$${esc(n.symbol || short(n.token))}</a><div class="faint" style="font-size:.8rem">${esc(n.name || '')} · ${esc(String(n.model || '').split('/').pop())} · ${ago(n.at)}${n.costUsd != null ? ' · $' + Number(n.costUsd).toFixed(4) : ''}</div></div></div><div class="facts">${chips.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div><div class="ntext">${esc(n.text || '')}</div><p style="margin-top:1.4rem"><a href="${href('/agora?tab=notes&token=' + n.token)}">← More notes from $${esc(n.symbol || '')}</a></p>`;
+  } catch (e) { h.textContent = 'Note not found'; box.innerHTML = `<div class="notice bad">${esc(e.message)}</div><p style="margin-top:.8rem"><a href="${href('/agora?tab=notes')}">← Back to notes</a></p>`; }
+});
+</script></body></html>

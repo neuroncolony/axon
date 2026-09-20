@@ -251,3 +251,16 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .feed-item .t{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px;white-space:nowrap}
 .feed-item .who{margin-bottom:6px}.feed-item .who a{color:var(--ink)}
 @media(max-width:560px){.feed-item{grid-template-columns:1fr}.feed-item .t{padding-top:0}}
+
+/* popups */
+.pops{position:fixed;right:18px;bottom:18px;z-index:80;display:flex;flex-direction:column;gap:10px;width:min(340px,calc(100vw - 36px));pointer-events:none}
+.pop{pointer-events:auto;display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card,#fff);border:1px solid var(--line,#e6e9ef);border-radius:16px;box-shadow:var(--shadow,0 10px 30px rgba(15,23,42,.10));text-decoration:none;color:inherit;opacity:0;transform:translateY(12px) scale(.98);transition:opacity .25s ease,transform .25s ease}
+.pop.in{opacity:1;transform:none}
+.pop-logo{width:38px;height:38px;border-radius:12px;object-fit:cover;background:var(--wash,#f3f5f9);flex:none}
+.pop-body{min-width:0;flex:1}
+.pop-title{font-weight:600;font-size:.92rem;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop-sub{font-size:.78rem;color:var(--muted,#6b7280);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop-x{flex:none;border:0;background:transparent;color:var(--muted,#6b7280);font-size:1.1rem;line-height:1;cursor:pointer;padding:4px 6px;border-radius:8px}
+.pop-x:hover{background:var(--wash,#f3f5f9)}
+.pop-launch{border-color:var(--blue-soft,#cfe0ff)} .pop-graduated{border-color:#bfe8cf}
+@media(max-width:640px){.pops{right:10px;bottom:10px;left:10px;width:auto}}

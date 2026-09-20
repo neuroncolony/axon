@@ -2,7 +2,7 @@
 Money facts stated plainly: the 2% creator tax accrues in the pons escrow in ETH. A keeper claims it to the treasury wallet.
 This server reads the treasury balance and books spend per message at OpenRouter list price. It never holds keys or moves ETH."""
 import os, time, threading, secrets, hashlib, re
-import chain, store, models as M
+import chain, store, models as M, holders, personas, agora
 try:
     from core.http_client import proxied_get, proxied_post
 except Exception:
@@ -41,13 +41,14 @@ def _record(snap, model=None, logo='', description='', tx=None, block=None):
             'launchedAt': store.now(), 'block': block, 'phase': snap['phase'], 'priceEth': snap['priceEth'], 'marketCapEth': snap['marketCapEth'],
             'curveState': snap['curve_state'], 'updatedAt': store.now()}
 
-def register_launch(txhash, model, logo, description):
+def register_launch(txhash, model, logo, description, socials=None):
     found = chain.token_from_receipt(txhash)
     if not found: raise PoolError('That transaction has no pons v2 launch event yet. Wait a block and retry.')
     if found['status'] != '0x1': raise PoolError('The launch transaction reverted.')
     snap = chain.token_snapshot(found['token'])
     if not snap['fundedByAxon']: raise PoolError('This token does not route its creator fee to the axon treasury, so it is not an axon launch.')
     rec = _record(snap, model if model in M.BY_ID else None, logo, description, txhash, found['block'])
+    so = socials or {}; rec['socials'] = {k: str(so.get(k, ''))[:200] for k in ('website', 'x', 'telegram')}
     TOKENS[rec['token'].lower()] = rec; store.save('tokens')
     store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': rec['model'], 'by': rec['deployer'], 'tx': txhash, 'at': store.now()})
     return {'ok': True, 'token': rec}
@@ -112,6 +113,9 @@ def refresh(force=False):
         _ix['lastBlock'] = head; _ix['at'] = time.time()
         _purge_foreign()
         _index_trades(head)
+        for rec in TOKENS.values():
+            try: holders.index_holders(rec, head, TOKENS)
+            except Exception as e: print('holders', rec.get('symbol'), repr(e), flush=True)
         for rec in sorted(TOKENS.values(), key=lambda r: r.get('updatedAt', 0))[:12]:
             try:
                 snap = chain.token_snapshot(rec['token'])
@@ -182,7 +186,9 @@ def token_detail(addr):
             snap = chain.token_snapshot(rec['token']); rec.update(phase=snap['phase'], priceEth=snap['priceEth'], marketCapEth=snap['marketCapEth'], updatedAt=store.now(), curveState=snap['curve_state']); store.save('tokens')
         except Exception: pass
     return {**enrich(rec), 'events': live_feed(30, token=rec['token']), 'takes': takes(20, token=rec['token']),
-            'bets': [b for b in store.read_jsonl('bets', 300) if b['token'] == rec['token']][-10:], 'spentUsd': LEDGER['byAddress'].get(rec['deployer'].lower(), 0.0)}
+            'bets': [b for b in store.read_jsonl('bets', 300) if b['token'] == rec['token']][-10:], 'spentUsd': LEDGER['byAddress'].get(rec['deployer'].lower(), 0.0),
+            'feesAccrued': holders.fees_accrued(rec, TRADES.get(rec['token'].lower(), []), eth_usd()), 'socials': rec.get('socials') or {'website': '', 'x': '', 'telegram': ''},
+            'persona': personas.get_persona(rec['token'], rec)}
 
 def events(limit=400): return store.read_jsonl('events', limit)
 def volume24(token):
@@ -289,12 +295,12 @@ def _clean(messages):
         out.append({'role': m['role'], 'content': m['content'][:6000]})
     return out
 SYSTEM = "You are answering inside axon, a launchpad on Robinhood Chain where 2% of every token trade funds model inference. Be direct and concise."
-def chat(address, model, messages, source='web'):
+def chat(address, model, messages, source='web', system_extra=''):
     if model not in M.BY_ID: raise PoolError('Pick a listed model.')
     if not entitlement(address)['hasLaunched']: raise PoolError('Chat is open to wallets that have launched a token here. Launch one, then come back.')
     st = stats()
     if st['availableUsd'] is not None and st['availableUsd'] - st['spentUsd'] <= 0.01: raise PoolError('The compute pool is spent. Trades refill it.')
-    msgs = _clean(messages); text, usage = _openrouter(model, msgs, system=SYSTEM); cost = _bill(address, model, usage)
+    msgs = _clean(messages); text, usage = _openrouter(model, msgs, system=(system_extra + ' ' + SYSTEM).strip()); cost = _bill(address, model, usage)
     store.append('chat', {'address': address.lower(), 'model': model, 'q': msgs[-1]['content'][:2000], 'a': text[:6000], 'usage': usage, 'costUsd': cost, 'source': source, 'at': store.now()})
     return {'reply': text, 'usage': usage, 'costUsd': cost, 'poolAvailableUsd': (st['availableUsd'] - st['spentUsd'] - cost) if st['availableUsd'] is not None else None}
 def history(address, model=''):
@@ -327,7 +333,7 @@ def completions(address, body):
 def agent_context(rec):
     e = enrich(rec)
     f = lambda v, fmt='{:.2f}': (fmt.format(v) if isinstance(v, (int, float)) else 'unknown')
-    return (f"You are the model behind ${e.get('symbol')} on axon. Facts you may use, nothing else: launched {e['age'] // 3600}h ago; status {e['status']}; "
+    return personas.context_prefix(rec['token'], rec) + (f"You are the model behind ${e.get('symbol')} on axon. Facts you may use, nothing else: launched {e['age'] // 3600}h ago; status {e['status']}; "
             f"price {f(e.get('priceUsd'), '{:.3e}')} USD; market cap {f(e.get('marketCapUsd'))} USD; graduation progress {f(e.get('graduation'), '{:.1%}')}; "
             f"24h volume {e['volume24hUsd']:.2f} USD across {e['trades24h']} trades; compute your launcher has spent: ${LEDGER['byAddress'].get(rec['deployer'].lower(), 0):.2f}. "
             "Never invent numbers; say unknown if unknown. Write 2 to 4 plain first-person sentences, no hype, no emojis.")
@@ -352,4 +358,19 @@ def run_agents(max_tokens=1):
             store.append('bets', {'token': rec['token'], 'symbol': rec.get('symbol'), 'model': rec['model'], 'call': call, 'mcapUsd': e.get('marketCapUsd'), 'result': None, 'at': store.now()})
             rec['lastTakeAt'] = store.now(); store.save('tokens'); done.append(rec['symbol'])
         except Exception as ex: print('agent', rec.get('symbol'), repr(ex), flush=True)
+    # daily notes, agora threads and call settlement, billed to each launcher
+    def ask(rec, prompt, max_tokens):
+        text, usage = _openrouter(rec['model'], [{'role': 'user', 'content': prompt}], max_tokens=max_tokens, system=agent_context(rec)); cost = _bill(rec['deployer'], rec['model'], usage)
+        e = enrich(rec); facts = {'priceUsd': e.get('priceUsd'), 'mcapUsd': e.get('marketCapUsd'), 'graduationPct': e.get('graduation'), 'volume24hUsd': e.get('volume24hUsd'), 'trades': e.get('trades24h'), 'ageDays': e['age'] // 86400}
+        return text, cost, facts
+    ours = [r for r in _ours() if r.get('model')]
+    try: agora.settle_calls(enrich, ours)
+    except Exception as ex: print('settle', repr(ex), flush=True)
+    for rec in sorted(ours, key=lambda r: r.get('lastNoteAt', 0))[:max_tokens]:
+        if store.now() - rec.get('lastNoteAt', 0) < 20 * 3600: continue
+        try:
+            if agora.write_daily_note(rec, ask): rec['lastNoteAt'] = store.now(); store.save('tokens'); done.append('note:' + str(rec.get('symbol')))
+        except Exception as ex: print('note', rec.get('symbol'), repr(ex), flush=True)
+    try: done.append(agora.tick_threads(ours, ask, enrich))
+    except Exception as ex: print('threads', repr(ex), flush=True)
     return {'posted': done}

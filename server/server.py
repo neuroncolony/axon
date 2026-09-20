@@ -13,7 +13,7 @@ sys.path.insert(0, str(WORKSPACE)); sys.path.insert(0, str(ROOT / 'server'))
 try:
     from dotenv import load_dotenv; load_dotenv(WORKSPACE / '.env', override=False)
 except Exception: pass
-import chain, store, models as MODELS, pool
+import chain, store, models as MODELS, pool, holders, personas, agora
 from eth_account.messages import encode_defunct
 from eth_account import Account
 
@@ -42,7 +42,7 @@ def get_session(tok):
     return None
 
 PAGES = {'': 'index.html', 'explore': 'explore.html', 'live': 'live.html', 'launch': 'launch.html', 'models': 'models.html', 'chat': 'chat.html', 'keys': 'keys.html', 'docs': 'docs.html',
-         'leaderboard': 'leaderboard.html', 'scoreboard': 'scoreboard.html', 'offspring': 'offspring.html', 'takes': 'takes.html', 'token': 'token.html'}
+         'leaderboard': 'leaderboard.html', 'scoreboard': 'scoreboard.html', 'offspring': 'offspring.html', 'takes': 'takes.html', 'token': 'token.html', 'agora': 'agora.html', 'note': 'note.html'}
 
 class H(BaseHTTPRequestHandler):
     server_version = 'axon/1'
@@ -92,7 +92,11 @@ class H(BaseHTTPRequestHandler):
         if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled()})
         if p == 'stats': return self.send(200, pool.stats())
         if p == 'treasury/claim': return self.send(200, chain.claim_tx(q.get('from')))
-        if p == 'models': return self.send(200, {'models': MODELS.MODELS, 'usage': pool.model_usage()})
+        if p == 'models':
+            counts = {}
+            for r in pool._ours():
+                if r.get('model'): counts[r['model']] = counts.get(r['model'], 0) + 1
+            return self.send(200, {'models': [{**m, 'spentUsd': pool.LEDGER['byModel'].get(m['id'], 0.0), 'tokens': counts.get(m['id'], 0)} for m in MODELS.MODELS], 'usage': pool.model_usage()})
         if p == 'tokens': return self.send(200, {'tokens': pool.token_list(sort=q.get('sort', 'new'), model=q.get('model'), status=q.get('status'), limit=int(q.get('limit', 50)))})
         if p == 'trades': return self.send(200, {'trades': pool.on_chain_trades(token=q.get('token'), limit=min(int(q.get('limit', 100)), 500))})
         if p == 'candles': return self.send(200, pool.candles(q.get('token', ''), interval_s=max(60, int(q.get('interval', 300))), limit=min(int(q.get('limit', 200)), 500)))
@@ -102,6 +106,28 @@ class H(BaseHTTPRequestHandler):
             svg = chain.avatar_svg(rec.get('symbol') if rec else None, p[6:-5])
             return self.send(200, body=svg.encode(), ctype='image/svg+xml', headers={'Cache-Control': 'public, max-age=3600'})
         if p.startswith('token/'): return self.send(200, pool.token_detail(p[6:]))
+        if p == 'live/recent':
+            try: since = int(q.get('since', 0))
+            except (TypeError, ValueError): since = 0
+            return self.send(200, {'events': holders.recent_events(pool.events(400), since, pool.TOKENS)})
+        if p == 'holders':
+            rec = pool.TOKENS.get(q.get('token', '').lower())
+            if not rec: return self.error(404, 'Unknown token.')
+            return self.send(200, holders.holders(rec['token'], rec, limit=min(int(q.get('limit', 50)), 200)))
+        if p in ('persona', 'persona/history', 'memory'):
+            rec = pool.TOKENS.get(q.get('token', '').lower())
+            if not rec: return self.error(404, 'Unknown token.')
+            if p == 'persona': return self.send(200, {'persona': personas.get_persona(rec['token'], rec), 'symbol': rec.get('symbol'), 'deployer': rec['deployer'], 'greeting': personas.get_persona(rec['token'], rec)['greeting']})
+            if p == 'persona/history': return self.send(200, {'history': personas.persona_history(rec['token'])})
+            return self.send(200, {'memory': personas.get_memory(rec['token'])})
+        if p == 'notes': return self.send(200, {'notes': agora.notes(token=q.get('token'), limit=min(int(q.get('limit', 60)), 200))})
+        if p.startswith('note/'):
+            n = agora.note(p[5:])
+            return self.send(200, n) if n else self.error(404, 'No such note.')
+        if p == 'threads': return self.send(200, {'threads': agora.threads(token=q.get('token'), status=q.get('status'), limit=min(int(q.get('limit', 50)), 200))})
+        if p.startswith('thread/'):
+            t = agora.thread(p[7:])
+            return self.send(200, t) if t else self.error(404, 'No such thread.')
         if p == 'live': return self.send(200, {'events': pool.live_feed(limit=int(q.get('limit', 60)), token=q.get('token'))})
         if p == 'takes': return self.send(200, {'takes': pool.takes(limit=int(q.get('limit', 60)), token=q.get('token'))})
         if p == 'leaderboard': return self.send(200, pool.leaderboard(q.get('by', 'mcap')))
@@ -158,7 +184,8 @@ class H(BaseHTTPRequestHandler):
                 return self.send(200, chain.launch_tx(d))
             if p == 'launch/confirm':
                 if not rate_limit('confirm:' + ip, 20): return self.error(429, 'Slow down.')
-                return self.send(200, pool.register_launch(d.get('tx', ''), d.get('model', ''), d.get('logo', ''), d.get('description', '')))
+                return self.send(200, pool.register_launch(d.get('tx', ''), d.get('model', ''), d.get('logo', ''), d.get('description', ''),
+                                                            socials={'website': d.get('website', ''), 'x': d.get('x', ''), 'telegram': d.get('telegram', '')}))
             if p == 'trade/prepare':
                 if not rate_limit('trade:' + ip, 30): return self.error(429, 'Slow down.')
                 return self.send(200, chain.trade_tx(d))
@@ -170,6 +197,16 @@ class H(BaseHTTPRequestHandler):
             if p == 'agents/run':
                 if not rate_limit('agents:' + ip, 2, 600): return self.error(429, 'Agents already ran recently.')
                 return self.send(200, pool.run_agents(max_tokens=int(d.get('n', 1))))
+            if p in ('persona', 'memory', 'memory/delete', 'compare'):
+                if not s or not self.csrf_ok(s): return self.error(401, 'Sign in with your wallet first.')
+                if p == 'compare':
+                    if not rate_limit('chat:' + s['address'], 20): return self.error(429, 'Slow down.')
+                    return self.send(200, personas.compare(s['address'], d.get('question', ''), d.get('tokens', [])))
+                rec = pool.TOKENS.get(str(d.get('token', '')).lower())
+                if not rec: return self.error(404, 'Unknown token.')
+                if p == 'persona': return self.send(200, {'persona': personas.set_persona(rec['token'], rec, s['address'], d)})
+                if p == 'memory': return self.send(200, {'memory': personas.add_memory(rec['token'], rec, s['address'], d.get('text', ''))})
+                return self.send(200, {'memory': personas.delete_memory(rec['token'], rec, s['address'], str(d.get('id', '')))})
             if p == 'chat':
                 if not s or not self.csrf_ok(s): return self.error(401, 'Sign in with your wallet first.')
                 if not rate_limit('chat:' + s['address'], 20): return self.error(429, 'Slow down.')

@@ -176,18 +176,20 @@ def launch_tx(form):
     name = str(form.get('name','')).strip(); symbol = str(form.get('symbol','')).strip().upper()
     description = str(form.get('description','')).strip(); logo = str(form.get('logo','')).strip()
     model = str(form.get('model','')).strip()
-    website = str(form.get('website','')).strip(); twitter = str(form.get('twitter','')).strip(); telegram = str(form.get('telegram','')).strip()
+    website = str(form.get('website','')).strip(); x = str(form.get('x','')).strip(); telegram = str(form.get('telegram','')).strip()
     if not (1 <= len(name.encode()) <= 64): raise ValueError('Name must be 1 to 64 bytes.')
     if not re.fullmatch(r'[A-Z0-9]{1,12}', symbol): raise ValueError('Symbol must be 1 to 12 letters or numbers.')
     if len(description.encode()) > 500 or len(logo.encode()) > 500: raise ValueError('Description and logo are capped at 500 bytes.')
     if logo and not logo.startswith('https://'): raise ValueError('Logo URL must be HTTPS.')
     if not re.fullmatch(r'[a-z0-9\-]+/[a-z0-9.\-:]+', model): raise ValueError('Pick a model.')
-    for u in (website, twitter, telegram):
+    for u in (website, x, telegram):
         if u and not u.startswith('https://'): raise ValueError('Links must be HTTPS.')
+    for u in (website, x, telegram):
+        if len(u.encode()) > 200: raise ValueError('Links are capped at 200 bytes.')
     salt = os.urandom(32)
     # model id rides in the description tail so it is recoverable on-chain without a server
     desc = (description + ('\n' if description else '') + 'axon:model=' + model)[:500]
-    socials = (twitter, telegram, '', website, '')
+    socials = (website, x, telegram, '', '')
     params = (name, symbol, logo, desc, socials, t, CREATOR_TAX_BPS, False, economics(), salt)
     data = calldata('launchToken(' + PARAM_TUPLE + ',uint256,address)', [PARAM_TUPLE, 'uint256', 'address'], [params, 0, ZERO])
     return {'tx':{'to':to_checksum_address(PONS),'data':data,'value':hex(launch_fee()),'chainId':CHAIN_ID},'creatorFeeRecipient':t,'creatorTaxBps':CREATOR_TAX_BPS,'model':model,'salt':'0x'+salt.hex()}
@@ -250,6 +252,22 @@ def trade_logs(curve, from_block, to_block='latest'):
         out.append({'side':'buy' if buy else 'sell','caller':to_checksum_address('0x'+l['topics'][1][-40:]),'trader':to_checksum_address('0x'+l['topics'][2][-40:]),
                     'ethWei':str(w[0] if buy else w[1]),'tokenWei':str(w[1] if buy else w[0]),'protocolFeeWei':str(w[2]),'creatorFeeWei':str(w[3]),
                     'tx':l['transactionHash'],'block':int(l['blockNumber'],16),'logIndex':int(l['logIndex'],16)})
+    return out
+
+TRANSFER_TOPIC = '0x' + keccak(text='Transfer(address,address,uint256)').hex()
+
+def transfer_logs(token, from_block, to_block='latest'):
+    """ERC20 Transfer events for `token`. topics[1] = from, topics[2] = to, data = value (uint256)."""
+    logs = rpc('eth_getLogs',[{'fromBlock':hex(int(from_block)),'toBlock':to_block if isinstance(to_block,str) else hex(int(to_block)),
+                               'address':addr(token),'topics':[TRANSFER_TOPIC]}])
+    out = []
+    for l in logs:
+        if len(l.get('topics', [])) < 3: continue
+        d = l['data'][2:]
+        try: value = str(int(d, 16)) if d else '0'
+        except ValueError: continue
+        out.append({'from':to_checksum_address('0x'+l['topics'][1][-40:]),'to':to_checksum_address('0x'+l['topics'][2][-40:]),
+                    'valueWei':value,'tx':l['transactionHash'],'block':int(l['blockNumber'],16),'logIndex':int(l['logIndex'],16)})
     return out
 
 def launch_logo(txhash):
