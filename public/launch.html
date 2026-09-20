@@ -64,11 +64,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   const provKey = p => String(p || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const provUrl = p => new URL(href('/static/providers/' + provKey(p) + '.svg'), location.origin).href;
   let modelsById = {}; const logo = { src: 'model', ownUrl: null, ownData: null, raw: null, edit: null };
+  const modelLogo = { provider: null, data: null, url: null };
   const pick = document.getElementById('logo-pick'); const fileIn = document.getElementById('f-file'); const actions = document.getElementById('lp-actions');
   function paintLogo() {
     for (const t of pick.querySelectorAll('.lp-tile')) t.classList.toggle('active', t.dataset.src === logo.src);
     const m = modelsById[document.getElementById('f-model').value];
-    const img = document.getElementById('lp-model-img'); img.src = m ? provUrl(m.provider) : ''; img.onerror = () => { img.src = href('/api/token/0x0000000000000000000000000000000000000000/logo'); };
+    const img = document.getElementById('lp-model-img');
+    modelLogo.data = null; modelLogo.url = null;
+    if (!m) { img.removeAttribute('src'); } else {
+      const want = m.provider; img.src = provUrl(want);
+      composeModelLogo(want).then(d => { if (d && modelsById[document.getElementById('f-model').value]?.provider === want) { modelLogo.data = d; modelLogo.provider = want; img.src = d; } }).catch(() => {});
+    }
     document.getElementById('lp-model-sub').textContent = m ? m.provider + ' mark' : 'Uses the provider mark';
     const fr = document.getElementById('lp-own-frame');
     fr.innerHTML = logo.ownData ? `<img src="${logo.ownData}" alt="">` : '<span class="lp-plus">+</span>';
@@ -102,6 +108,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     const k = b / 100;
     for (const [ex, ey, rx, ry, rot] of E) { c.beginPath(); c.ellipse(cx - b / 2 + ex * k, cy - b / 2 + ey * k, rx * k * 0.78, ry * k * 0.78, rot * Math.PI / 180, 0, Math.PI * 2); c.fill(); }
     c.restore();
+  }
+  /* the model mark, rendered to a 512 px square and stamped with the same footprint as an uploaded logo */
+  function composeModelLogo(provider) {
+    return new Promise((resolve, reject) => {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => {
+        const OUT = 512, cv = document.createElement('canvas'); cv.width = cv.height = OUT;
+        const c = cv.getContext('2d');
+        c.fillStyle = '#ffffff'; c.fillRect(0, 0, OUT, OUT);
+        const pad = OUT * 0.17, box = OUT - pad * 2;
+        const sc = Math.min(box / im.width, box / im.height);
+        const w = im.width * sc, h = im.height * sc;
+        c.imageSmoothingQuality = 'high';
+        c.drawImage(im, (OUT - w) / 2, (OUT - h) / 2, w, h);
+        stampMark(c, OUT);
+        try { resolve(cv.toDataURL('image/png')); } catch (e) { reject(e); }
+      };
+      im.onerror = () => reject(new Error('mark'));
+      im.src = provUrl(provider);
+    });
   }
   function openCropper(img, prev) {
     const S = 320, OUT = 512;
@@ -179,6 +205,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await ensureChain();
       let logoUrl = provUrl(modelsById[model]?.provider);
+      if (logo.src === 'model') {
+        const prov = modelsById[model]?.provider;
+        if (modelLogo.url && modelLogo.provider === prov) { logoUrl = modelLogo.url; }
+        else {
+          const d = modelLogo.data && modelLogo.provider === prov ? modelLogo.data : await composeModelLogo(prov).catch(() => null);
+          if (d) { submit.textContent = 'Preparing logo…'; const up = await api('logo/upload', { data: d }); modelLogo.url = up.url; modelLogo.provider = prov; logoUrl = up.url; }
+        }
+      }
       if (logo.src === 'own') { if (!logo.ownUrl) { submit.textContent = 'Uploading logo…'; const up = await api('logo/upload', { data: logo.ownData }); logo.ownUrl = up.url; } logoUrl = logo.ownUrl; }
       submit.textContent = 'Confirm in wallet…';
       devBuyWei();
