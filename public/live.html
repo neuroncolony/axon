@@ -18,7 +18,14 @@
       <p class="hint" style="margin-top:1rem">Trades are counted when made through this site. Trades made elsewhere are not indexed yet.</p>
     </div>
     <div>
-      <div class="grid" style="grid-template-columns:1fr;gap:12px" id="stats">
+      <div class="card" id="treasury-card">
+        <div class="eyebrow">Treasury</div>
+        <p style="margin:.5rem 0 0"><a id="treasury-link" class="mono" href="#" target="_blank" rel="noopener">…</a></p>
+        <p style="margin:.5rem 0 0" id="claimable-line">Claimable now: …</p>
+        <p class="hint" style="margin:.5rem 0 0">Every launch on this site pays a 2% creator tax to this wallet on top of the 1% pons base fee. Launchers keep nothing. Tax accrues on each curve, is swept to the pons escrow, and the treasury wallet claims it here.</p>
+        <button class="btn" id="claim-btn" style="margin-top:.75rem">Claim to treasury</button>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr;gap:12px;margin-top:1rem" id="stats">
         <div class="card stat"><div class="k">Compute raised</div><div class="v" data-k="raisedUsd">n/a</div></div>
         <div class="card stat"><div class="k">Available</div><div class="v" data-k="availableUsd">n/a</div></div>
         <div class="card stat"><div class="k">Spent</div><div class="v" data-k="spentUsd">n/a</div></div>
@@ -31,7 +38,7 @@
 <footer class="footer" id="footer"></footer>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
-  const { api, esc, fmtUsd, ago, href, short } = AXON;
+  const { api, esc, fmtUsd, ago, href, short, sendTx } = AXON;
   const usd = v => v == null ? 'n/a' : fmtUsd(v);
   let filter = '';
   function loadFeed() {
@@ -61,5 +68,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   loadFeed(); loadStats();
   setInterval(loadFeed, 15000);
   setInterval(loadStats, 30000);
+
+  // Treasury card
+  const claimBtn = document.getElementById('claim-btn');
+  const claimableLine = document.getElementById('claimable-line');
+  let treasury = null;
+  const shortAddr = a => a ? a.slice(0, 6) + '…' + a.slice(-4) : '';
+  function fillTreasury(s) {
+    treasury = (s.treasury || '').toLowerCase() || null;
+    const link = document.getElementById('treasury-link');
+    link.textContent = shortAddr(s.treasury);
+    link.href = AXON.CHAIN.explorer + '/address/' + s.treasury;
+    const c = s.claimableEth;
+    const has = c != null && Number(c) > 0;
+    claimableLine.textContent = 'Claimable now: ' + (c == null ? 'unknown' : Number(c).toFixed(4) + ' ETH');
+    claimBtn.disabled = !has;
+    claimBtn.textContent = has ? 'Claim to treasury' : 'Nothing to claim yet';
+  }
+  function checkWallet() {
+    if (!treasury) return;
+    const addr = (AXON.state.address || '').toLowerCase();
+    if (addr && addr !== treasury) AXON.toast('Connect the treasury wallet (' + shortAddr(treasury) + ') to claim.');
+  }
+  claimBtn.addEventListener('click', async () => {
+    try {
+      if (!AXON.state.address) { await AXON.openWalletModal(); return; }
+      if ((AXON.state.address || '').toLowerCase() !== treasury) { AXON.toast('Connect the treasury wallet (' + shortAddr(treasury) + ') to claim.'); return; }
+      claimBtn.disabled = true;
+      const res = await api('treasury/claim');
+      const { hash } = await sendTx(res.tx, res.tx.to);
+      AXON.toast('Claim sent: ' + short(hash));
+      claimBtn.textContent = 'Claim sent. Refreshing…';
+      setTimeout(async () => { try { fillTreasury(await api('status')); } catch {} }, 8000);
+    } catch (e) { AXON.toast(e.message); claimBtn.disabled = false; }
+  });
+  document.addEventListener('axon:wallet', checkWallet);
+  api('status').then(fillTreasury).catch(() => { claimableLine.textContent = 'Claimable now: unknown'; claimBtn.disabled = true; claimBtn.textContent = 'Nothing to claim yet'; });
 });
 </script></body></html>

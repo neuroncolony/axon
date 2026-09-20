@@ -10,7 +10,7 @@
       <form id="form">
         <label class="field"><span>Name</span><input id="f-name" maxlength="40" required><span class="hint">Shown on the token page and in markets.</span></label>
         <label class="field"><span>Symbol</span><input id="f-symbol" maxlength="12" required style="text-transform:uppercase" pattern="[A-Za-z0-9]{1,12}"><span class="hint">Uppercase, 1 to 12 characters.</span></label>
-        <label class="field"><span>Model</span><select id="f-model"><option>Loading catalogue…</option></select><span class="hint">The token funds this model. Its fees become compute that holders can spend talking to it.</span></label>
+        <label class="field"><span>Model</span><select id="f-model"><option>Loading catalogue…</option></select><span class="hint">The token funds this model. Every trade pays a 2% creator tax to the site treasury on top of the 1% pons fee. Launchers keep no fee share; the tax becomes compute that holders spend talking to the model.</span></label>
         <label class="field"><span>Description</span><textarea id="f-desc" rows="4" maxlength="500"></textarea><span class="hint">Up to 500 characters.</span></label>
         <label class="field"><span>Logo URL</span><input id="f-logo" type="url" placeholder="https://…"><span class="hint">Optional. Must be an https URL.</span></label>
         <label class="field"><span>Website</span><input id="f-website" type="url" placeholder="https://…"><span class="hint">Optional.</span></label>
@@ -24,7 +24,7 @@
       <div class="card">
         <div class="eyebrow">What happens</div>
         <ul class="prose" style="margin:.75rem 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:8px;font-size:.875rem">
-          <li>Launch fee: <b id="w-fee">…</b>, paid to the pons v2 factory.</li>
+          <li>Launch fee: <b id="w-fee">…</b>, paid to the pons v2 factory. <span class="hint">Do not send ETH directly to the factory or treasury. The 0.0005 ETH fee rides on the launch transaction your wallet signs here; a bare transfer is lost.</span></li>
           <li>A 2% creator tax on every curve trade goes to the treasury <span id="w-treasury">…</span>.</li>
           <li>The whole supply goes on a bonding curve. Price rises with buys, falls with sells.</li>
           <li>At graduation the curve's liquidity moves to a Uniswap v4 pool and the token trades there.</li>

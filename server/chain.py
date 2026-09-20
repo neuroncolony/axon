@@ -84,6 +84,7 @@ def status():
             out['launchFeeEth'] = eth(launch_fee())
             cfg = call(PONS,'getLaunchConfig(uint256)',['uint256'],[0],['uint256','uint256','uint256','uint256','uint24','int24','bool'])
             out['baseFeeBps'] = cfg[1]
+            out['claimableEth'] = eth(escrow_claimable(out['treasury'])) if out['treasury'] else None
             out['ok'] = True
         except Exception as e:
             out['error'] = str(e)[:160]
@@ -213,3 +214,12 @@ def treasury_balance():
     t = treasury()
     if not t: return {'treasury':None,'balanceWei':None}
     return cached('treasury:'+t, lambda: {'treasury':t,'balanceWei':str(int(rpc('eth_getBalance',[t,'latest']),16))}, ttl=30)
+
+def escrow_claimable(recipient):
+    """ETH the pons fee escrow owes `recipient`. Trades pay the 2% creator tax into the curve; sweepFees moves it here; claim() pays it out."""
+    return call(ESCROW, 'balanceOf(address)', ['address'], [addr(recipient)])[0]
+def claim_tx():
+    """Escrow claim(). Pays msg.sender its balance, so it must be signed by the treasury wallet itself."""
+    t = treasury()
+    if not t: raise ChainError('AXON_TREASURY is not configured.')
+    return {'tx': {'to': to_checksum_address(ESCROW), 'data': calldata('claim()'), 'value': '0x0', 'chainId': CHAIN_ID}, 'claimTo': t, 'claimableWei': str(escrow_claimable(t))}
