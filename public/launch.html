@@ -85,6 +85,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('f-model').addEventListener('change', paintLogo);
 
   /* cropper: pan (drag), zoom (wheel, pinch, slider), rotate (90 steps + fine), flip, fit, fill, reset. Exports 512 px PNG. */
+
+  /* the axon footprint, drawn small in the bottom right of any logo we mint */
+  function stampMark(c, size) {
+    const b = size * 0.219, m = size * 0.047, x = size - m - b, y = x, ring = b * 0.0625;
+    const rr = (px, py, w, h, r) => { c.beginPath(); c.moveTo(px + r, py); c.arcTo(px + w, py, px + w, py + h, r); c.arcTo(px + w, py + h, px, py + h, r); c.arcTo(px, py + h, px, py, r); c.arcTo(px, py, px + w, py, r); c.closePath(); };
+    c.save();
+    c.fillStyle = 'rgba(255,255,255,.92)'; rr(x - ring, y - ring, b + ring * 2, b + ring * 2, (b + ring * 2) / 3); c.fill();
+    c.fillStyle = '#0b1a33'; rr(x, y, b, b, b / 3); c.fill();
+    c.fillStyle = '#0747e0'; c.beginPath(); c.arc(x + b / 2, y + b / 2, b * 0.21, 0, Math.PI * 2); c.fill();
+    c.restore();
+  }
   function openCropper(img, prev) {
     const S = 320, OUT = 512;
     const st = prev ? { ...prev } : { x: 0, y: 0, zoom: 1, rot: 0, flip: false };
@@ -123,7 +134,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (k === 'fit') { st.zoom = Math.min(S / img.width, S / img.height) / base; st.x = st.y = 0; } if (k === 'reset') { st.x = st.y = 0; st.zoom = 1; st.rot = 0; st.flip = false; } render(); };
     m.onclick = e => { if (e.target === m || e.target.dataset.x !== undefined) m.remove(); };
     m.querySelector('[data-ok]').onclick = () => {
-      const out = document.createElement('canvas'); out.width = out.height = OUT; draw(out.getContext('2d'), OUT);
+      const out = document.createElement('canvas'); out.width = out.height = OUT; const octx = out.getContext('2d'); draw(octx, OUT);
+      stampMark(octx, OUT);
       let data = out.toDataURL('image/png'); if (data.length > 1.1e6) data = out.toDataURL('image/jpeg', 0.9);
       logo.ownData = data; logo.ownUrl = null; logo.raw = img; logo.edit = { ...st }; logo.src = 'own'; m.remove(); paintLogo();
     };

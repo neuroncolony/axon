@@ -6,3 +6,4 @@ data/*.jsonl
 data/*.tmp
 __pycache__/
 *.pyc
+_qa/

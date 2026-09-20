@@ -32,7 +32,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .nav{position:sticky;top:0;z-index:50;height:0;overflow:visible}
 .nav .wrap{position:relative;height:101px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:20px}
 .nav .pill{height:64px;display:flex;align-items:center;gap:4px;padding:0 12px;border-radius:20px;background:transparent;transition:background .4s var(--ease),box-shadow .4s var(--ease)}
-.nav[data-stuck] .pill{background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);box-shadow:var(--glass-shadow)}
+.nav[data-stuck] .pill{background:var(--glass);backdrop-filter:blur(34px) saturate(190%);-webkit-backdrop-filter:blur(34px) saturate(190%);box-shadow:var(--glass-shadow)}
 .nav .pill-right{gap:8px;padding:0 10px}
 .nav-x{display:grid;place-items:center;width:40px;height:40px;border-radius:14px;color:var(--ink);transition:background .4s var(--ease)}
 .nav-x:hover{background:var(--wash);color:var(--ink)}
@@ -45,7 +45,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .nav-links a:after{content:"";position:absolute;left:12px;right:12px;bottom:2px;height:2px;border-radius:2px;background:var(--blue);transform:scaleX(0);transform-origin:left;transition:transform .4s var(--ease)}
 .nav-links a:hover,.nav-links a.active{color:var(--ink)}.nav-links a.active:after{transform:scaleX(1)}
 .nav-burger{display:none;width:44px;height:40px;border-radius:16px;font-size:20px;padding:0}
-.nav-mobile{display:none;position:fixed;top:92px;right:20px;left:auto;width:auto;min-width:200px;max-width:min(300px,calc(100vw - 40px));z-index:49;padding:8px;border-radius:20px;background:var(--glass);backdrop-filter:blur(28px) saturate(180%);-webkit-backdrop-filter:blur(28px) saturate(180%);box-shadow:var(--glass-shadow);flex-direction:column;gap:2px;transform-origin:top right;animation:popin .28s var(--ease)}
+.nav-mobile{display:none;position:fixed;top:92px;right:20px;left:auto;width:auto;min-width:200px;max-width:min(300px,calc(100vw - 40px));z-index:49;padding:8px;border-radius:20px;background:var(--glass);backdrop-filter:blur(34px) saturate(190%);-webkit-backdrop-filter:blur(34px) saturate(190%);box-shadow:var(--glass-shadow);flex-direction:column;gap:2px;transform-origin:top right;animation:popin .28s var(--ease)}
 @keyframes popin{from{opacity:0;transform:translateY(-6px) scale(.96)}}
 .nav-mobile.open{display:flex}.nav-mobile a{padding:9px 14px;border-radius:12px;font-family:var(--head);font-size:16px;font-weight:500;color:var(--ink-80)}.nav-mobile a:hover,.nav-mobile a.active{background:var(--wash-1);color:var(--ink)}
 .nav-mobile .nm-actions{display:flex;gap:8px;padding:8px 6px 2px}
@@ -202,7 +202,8 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .reveal{animation:reveal .8s var(--spring) both}
 /* responsive */
 @media(max-width:1280px){.cap{height:46px;font-size:13px;padding:0 16px 0 7px}.cap .ic{width:30px;height:30px}.cap-2,.cap-6{display:none}.cap-4,.cap-8{--dx:22px}}
-@media(max-width:1240px){.nav-links{display:none}.nav-burger{display:inline-flex}}
+@media(max-width:1240px) and (min-width:861px){.nav-links{display:flex;gap:0}.nav-links a{padding:6px 9px;font-size:16px}}
+@media(max-width:860px){.nav-links{display:none}.nav-burger{display:inline-flex}}
 @media(max-width:900px){.split,.grid.c3,.grid.c4{grid-template-columns:repeat(2,minmax(0,1fr))}.fgrid{grid-template-columns:1fr 1fr}.fgrid>div:first-child{grid-column:1/-1;max-width:none}
 .nav .pill-right{display:none}.nav-burger{display:inline-flex}
 .cap{height:40px;font-size:12px;padding:0 14px 0 6px;gap:7px}.cap .ic{width:26px;height:26px}.cap .ic img{width:14px;height:14px}
@@ -321,3 +322,5 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .xsel-menu::-webkit-scrollbar-track{background:transparent;margin:8px 0}
 .xsel-menu::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:999px;border:3px solid transparent;background-clip:content-box}
 .xsel-menu::-webkit-scrollbar-thumb:hover{background:var(--muted-2);background-clip:content-box;border:3px solid transparent}
+
+@supports not ((backdrop-filter:blur(4px)) or (-webkit-backdrop-filter:blur(4px))){.nav[data-stuck] .pill,.nav-mobile{background:rgba(255,255,255,.95)}}
