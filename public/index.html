@@ -51,11 +51,13 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const { api, esc, fmtUsd, ago, pct, href, short } = AXON;
   const usd = v => v == null ? '·' : fmtUsd(v);
+  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
+  const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
   // capsules are static links to the launcher with model preselected
   api('tokens?sort=new&limit=10').then(({ tokens }) => {
     const tb = document.getElementById('rows');
     if (!tokens.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing launched yet. A token address is the only identifier that cannot be copied. <a href="${href('/launch')}">Be first →</a></div></td></tr>`; return; }
-    tb.innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || '·')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : '·'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${t.status}</span></td></tr>`).join('');
+    tb.innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${logoImg(t)}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || '·')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : '·'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${t.status}</span></td></tr>`).join('');
   }).catch(e => { document.getElementById('rows').innerHTML = `<tr><td colspan="8" class="down">${esc(e.message)}</td></tr>`; });
   api('live?limit=6').then(({ events }) => {
     const f = document.getElementById('feed');

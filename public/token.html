@@ -1,7 +1,8 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{BRAND}} · Token</title><meta name="description" content="{{DESCRIPTION}}">
 <link rel="stylesheet" href="../static/styles.css"><script src="../static/shell.js" defer></script>
-<style>.thead{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;padding:8px 0 16px}.thead .logo{width:64px;height:64px;border-radius:20px;background:var(--blue-soft);box-shadow:var(--shadow);object-fit:cover;flex:none}.thead h1{font-size:clamp(28px,3.4vw,44px);line-height:1.05}.addr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}.kv{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;margin:0}.kv dt{color:var(--muted)}.kv dd{margin:0;font-family:var(--mono);text-align:right;color:var(--ink)}.seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--wash);margin-bottom:12px}.seg button{border:0;background:none;height:32px;padding:0 14px;border-radius:999px;font-family:var(--head);font-weight:500;font-size:14px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}.seg button.on{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}</style></head>
+<style>.thead{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;padding:8px 0 16px}.thead .logo{width:64px;height:64px;border-radius:20px;background:var(--blue-soft);box-shadow:var(--shadow);object-fit:cover;flex:none}.thead h1{font-size:clamp(28px,3.4vw,44px);line-height:1.05}.addr{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}.kv{display:grid;grid-template-columns:1fr auto;gap:8px 16px;font-size:14px;margin:0}.kv dt{color:var(--muted)}.kv dd{margin:0;font-family:var(--mono);text-align:right;color:var(--ink)}.seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--wash);margin-bottom:12px}.seg button{border:0;background:none;height:32px;padding:0 14px;border-radius:999px;font-family:var(--head);font-weight:500;font-size:14px;color:var(--ink-80);cursor:pointer;transition:background .4s var(--ease),color .4s var(--ease)}.seg button.on{background:var(--ink);color:#fff;box-shadow:var(--chip-gloss)}
+.chart-wrap{position:relative;height:320px}.chart-wrap canvas{width:100%;height:100%;display:block}.chart-tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font-family:var(--mono);font-size:12px;line-height:1.5;padding:8px 10px;border-radius:10px;box-shadow:var(--shadow);white-space:nowrap;z-index:5;display:none}.chart-tip .up{color:#7ee2a8}.chart-tip .down{color:#ff9d92}.stat .sub{font-size:13px;color:var(--muted);font-family:var(--mono)}</style></head>
 <body><header class="nav" id="nav"></header>
 <main class="page"><div class="wrap" id="root"><p class="faint">Reading the chain…</p></div></main>
 <footer class="footer" id="footer"></footer>
@@ -11,39 +12,154 @@ document.addEventListener('DOMContentLoaded', async () => {
   const addr = (location.pathname.split('/token/')[1] || '').split(/[/?#]/)[0];
   const root = document.getElementById('root'); const usd = v => v == null ? 'n/a' : fmtUsd(v);
   const EXP = AXON.CHAIN.explorer;
+  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
+  const logoImg = (t, cls) => `<img class="${cls || 'logo'}" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
   if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) { root.innerHTML = `<div class="empty">That is not a token address. <a href="${href('/explore')}">Back to markets</a></div>`; return; }
   let t; try { t = await api('token/' + addr); } catch (e) { root.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; return; }
   const cs = t.curveState || {}; const grad = t.status === 'Graduated';
   const feedItem = e => `<div class="feed-item"><div class="t">${ago(e.at)}</div><div><div class="who"><b>$${esc(t.symbol || '?')}</b>${e.model ? `<span class="chip">${esc(String(e.model).split('/')[1] || e.model)}</span>` : ''}<span>${e.type === 'take' ? 'said' : e.type === 'bet' ? (e.result ? `call ${esc(e.call)}: ${esc(e.result)}` : `calls ${esc(e.call)} for 24h`) : e.type === 'trade' ? `${esc(e.side)} · ${Number(e.ethValue).toFixed(4)} ETH · <a href="${EXP}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>` : `launched · <a href="${EXP}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>`}</span></div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`;
   const list = rows => rows.length ? rows.map(feedItem).join('') : '<div class="empty">Nothing yet.</div>';
+  // stats helpers: show 0 as $0 / 0, n/a only for null
+  const eth3 = wei => wei == null ? 'n/a' : Number(BigInt(wei) / 1000000000000000n) / 1000 + ' ETH';
+  const priceEthTxt = p => p == null ? 'n/a' : p < 1e-6 ? p.toExponential(2).replace('e', 'e') + ' ETH' : p.toFixed(p < 1 ? 8 : 2) + ' ETH';
   root.innerHTML = `
-  <div class="thead">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}
+  <div class="thead">${logoImg(t)}
     <div style="flex:1;min-width:16rem"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h1>${esc(t.name || short(t.token))}</h1><span class="chip ${grad ? 'up' : ''}">${esc(t.status)}</span>${t.modelName ? `<span class="chip mint">backs ${esc(t.modelName)}</span>` : '<span class="chip">model not recorded</span>'}</div>
       <div class="mono faint" style="font-size:14px;margin:.2rem 0 .5rem">$${esc(t.symbol || '?')} · ETH · launched ${ago(t.launchedAt)} ago by <a href="${EXP}/address/${t.deployer}" target="_blank" rel="noopener">${short(t.deployer)} ↗</a></div>
       <div class="addr"><span class="mono">${t.token}</span><button class="copy" id="cp">copy</button><a href="${EXP}/address/${t.token}" target="_blank" rel="noopener">explorer ↗</a><a href="${EXP}/address/${t.curve}" target="_blank" rel="noopener">curve ↗</a></div>
       ${t.description ? `<p class="muted" style="margin:.75rem 0 0;max-width:40rem;white-space:pre-wrap">${esc(t.description.replace(/\n?axon:model=\S+/, ''))}</p>` : ''}</div>
     <div>${t.model ? `<a class="btn" href="${href('/chat')}?model=${encodeURIComponent(t.model)}">Talk to this model →</a>` : ''}</div></div>
   <div class="grid c4" style="margin:1.5rem 0">
-    <div class="card stat"><div class="k">Price</div><div class="v">${usd(t.priceUsd)}</div></div>
-    <div class="card stat"><div class="k">Market cap</div><div class="v">${usd(t.marketCapUsd)}</div></div>
-    <div class="card stat"><div class="k">24h volume</div><div class="v">${t.trades24h ? usd(t.volume24hUsd) : 'n/a'}</div><div class="faint" style="font-size:13px">${t.trades24h} trades via this site</div></div>
-    <div class="card stat"><div class="k">Graduation</div><div class="v">${pct(t.graduation)}</div><span class="bar" style="width:100%"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span></div>
+    <div class="card stat"><div class="k">Price</div><div class="v">${usd(t.priceUsd)}</div><div class="sub">${priceEthTxt(t.priceEth)}</div></div>
+    <div class="card stat"><div class="k">Market cap</div><div class="v">${usd(t.marketCapUsd)}</div><div class="sub">${t.marketCapEth == null ? 'n/a' : t.marketCapEth.toFixed(4) + ' ETH'}</div></div>
+    <div class="card stat"><div class="k">24h volume</div><div class="v">${usd(t.volume24hUsd)}</div><div class="sub">${t.trades24h == null ? 'n/a' : t.trades24h + ' trades on chain'}</div></div>
+    <div class="card stat"><div class="k">Graduation</div><div class="v">${pct(t.graduation)}</div><span class="bar" style="width:100%"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span><div class="sub">${eth3(cs.balanceWei)} / ${eth3(cs.graduationThreshold)}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:1.25rem">
+    <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:10px"><div class="eyebrow" style="margin:0">Price</div>
+      <div class="seg" id="cseg" style="margin:0"><button data-i="60">1m</button><button data-i="300" class="on">5m</button><button data-i="900">15m</button><button data-i="3600">1h</button><button data-i="86400">1d</button></div></div>
+    <div class="chart-wrap"><canvas id="chart"></canvas><div class="chart-tip" id="chart-tip"></div></div>
   </div>
   <div class="split">
     <div>
       <div class="card"><div class="eyebrow" style="margin-bottom:10px">Curve</div><dl class="kv">
-        ${[['ETH reserve', cs.ethReserve, 'eth'], ['Raised', cs.totalRaised, 'eth'], ['Graduation threshold', cs.graduationThreshold, 'eth'], ['Curve ETH balance', cs.balanceWei, 'eth'], ['Token reserve', cs.tokenReserve, 'tok'], ['Total supply', t.totalSupply, 'tok'], ['Creator tax', (t.creatorTaxBps != null ? t.creatorTaxBps / 100 + '%' : '2%'), 'raw'], ['Pool fee', t.poolFee != null ? (t.poolFee / 1e4) + '%' : 'n/a', 'raw']].filter(([, v]) => v != null).map(([k, v, kind]) => `<dt>${k}</dt><dd>${kind === 'eth' ? fmtEth(v, 5) + ' ETH' : kind === 'tok' ? (Number(BigInt(v)) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 }) : esc(v)}</dd>`).join('')}
-      </dl><p class="faint" style="font-size:13px;margin:.75rem 0 0">Price is a spot quote for a 0.001 ETH buy, read live from the curve. Volume counts trades made through this site only.</p></div>
-      <div class="tabs" style="margin-top:1.25rem" id="tabs"><button class="active" data-t="feed">Feed</button><button data-t="takes">Takes</button><button data-t="bets">Calls</button></div>
+        ${[['Virtual ETH reserve', cs.ethReserve, 'eth'], ['Token reserve', cs.tokenReserve, 'tok'], ['Curve ETH balance', cs.balanceWei, 'eth'], ['Graduation threshold', cs.graduationThreshold, 'eth'], ['Spot price (ETH)', cs.priceEth, 'price']].filter(([, v]) => v != null).map(([k, v, kind]) => `<dt>${k}</dt><dd>${kind === 'eth' ? fmtEth(v, 5) + ' ETH' : kind === 'tok' ? (Number(BigInt(v)) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 0 }) : kind === 'price' ? priceEthTxt(v) : esc(v)}</dd>`).join('')}
+      </dl><p class="faint" style="font-size:13px;margin:.75rem 0 0">Price is the spot price from the curve reserves, read live. Volume and trades are read from the chain.</p></div>
+      <div class="tabs" style="margin-top:1.25rem" id="tabs"><button class="active" data-t="trades">Trades</button><button data-t="feed">Activity</button><button data-t="takes">Takes</button><button data-t="bets">Calls</button></div>
       <div id="tabbody" class="feed"></div>
     </div>
     <div id="trade"></div>
   </div>`;
   document.getElementById('cp').onclick = () => navigator.clipboard.writeText(t.token).then(() => toast('Address copied.'));
+  // ---------- tabs: trades (default), activity, takes, calls
+  const tb = document.getElementById('tabbody');
+  const tabsEl = document.getElementById('tabs');
+  let activeTab = 'trades';
+  const tradeRow = r => {
+    const buy = r.side === 'buy';
+    return `<div class="feed-item"><div class="t">${ago(r.at)}</div><div><div class="who"><span class="chip ${buy ? 'up' : 'down'}">${buy ? 'Buy' : 'Sell'}</span><span class="mono">${Number(BigInt(r.ethWei)) / 1e18 < 0.0001 ? (Number(BigInt(r.ethWei)) / 1e18).toFixed(6) : (Number(BigInt(r.ethWei)) / 1e18).toFixed(4)} ETH</span><span class="mono faint">${compact(Number(BigInt(r.tokenWei)) / 1e18)} tok</span><span class="mono">${r.priceEth == null ? 'n/a' : usd(r.priceEth * (t.ethUsd || 0))}</span><a class="mono" href="${EXP}/address/${r.trader}" target="_blank" rel="noopener">${short(r.trader)} ↗</a><a href="${EXP}/tx/${r.tx}" target="_blank" rel="noopener">tx ↗</a></div></div></div>`;
+  };
+  const compact = n => n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : n.toFixed(n < 1 ? 4 : 2);
+  let trades = [], lastTx = '';
+  async function loadTrades() {
+    try { const d = await api('trades?token=' + t.token + '&limit=100'); const rows = d.trades || [];
+      if (rows.length && rows[0].tx === lastTx) return;
+      trades = rows; lastTx = rows.length ? rows[0].tx : '';
+      if (activeTab === 'trades') tb.innerHTML = trades.length ? trades.map(tradeRow).join('') : '<div class="empty">No trades yet. Be the first.</div>';
+    } catch (e) { if (activeTab === 'trades') tb.innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; }
+  }
   const tabs = { feed: list(t.events || []), takes: list((t.takes || []).map(k => ({ ...k, type: 'take' }))), bets: list((t.bets || []).slice().reverse().map(b => ({ ...b, type: 'bet' }))) };
-  const tb = document.getElementById('tabbody'); tb.innerHTML = tabs.feed;
-  document.getElementById('tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; for (const x of e.currentTarget.children) x.classList.toggle('active', x === b); tb.innerHTML = tabs[b.dataset.t]; };
-  // trade widget
+  function showTab(name) {
+    activeTab = name;
+    for (const x of tabsEl.children) x.classList.toggle('active', x.dataset.t === name);
+    if (name === 'trades') tb.innerHTML = trades.length ? trades.map(tradeRow).join('') : '<div class="empty">No trades yet. Be the first.</div>';
+    else tb.innerHTML = tabs[name];
+  }
+  tabsEl.onclick = e => { const b = e.target.closest('button'); if (b) showTab(b.dataset.t); };
+  showTab('trades'); loadTrades(); setInterval(loadTrades, 10000);
+  // ---------- chart
+  const cv = document.getElementById('chart'), tip = document.getElementById('chart-tip');
+  let interval = 300, candles = [], ethUsd = 0, hoverX = null;
+  const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const UP = cssVar('--green') || '#16a34a', DOWN = cssVar('--red') || '#dc2626', INK = cssVar('--ink') || '#0b1a33', LINE = cssVar('--line-2') || 'rgba(11,26,51,.14)', FAINT = cssVar('--faint') || '#9aa9c0';
+  function drawChart() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (!w || !h) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
+    const padL = 8, padR = 64, padT = 10, padB = 22;
+    const pw = w - padL - padR, ph = h - padT - padB;
+    const useUsd = ethUsd > 0;
+    const price = c => useUsd ? c * ethUsd : c;
+    const data = candles.length ? candles : [];
+    if (!data.length) { g.fillStyle = FAINT; g.font = '13px ' + cssVar('--mono'); g.fillText('No trades yet, showing spot price', 10, h / 2); return; }
+    let lo = Infinity, hi = -Infinity;
+    for (const c of data) { lo = Math.min(lo, price(c.l)); hi = Math.max(hi, price(c.h)); }
+    if (data.length <= 1) { lo = price(data[0].c) * 0.98; hi = price(data[0].c) * 1.02; }
+    if (hi === lo) { hi *= 1.001; lo /= 1.001; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const y = v => padT + ph * (1 - (v - lo) / (hi - lo));
+    const n = data.length;
+    const step = n > 1 ? pw / (n - 1) : pw / 2;
+    const cw = Math.max(1, Math.min(14, step * 0.6));
+    // grid + y labels
+    g.font = '11px ' + cssVar('--mono'); g.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const v = lo + (hi - lo) * i / 4, yy = y(v);
+      g.strokeStyle = LINE; g.lineWidth = 1; g.beginPath(); g.moveTo(padL, yy); g.lineTo(padL + pw, yy); g.stroke();
+      g.fillStyle = FAINT; g.textAlign = 'left';
+      g.fillText(fmtAxis(v), padL + pw + 6, yy);
+    }
+    // x time labels
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    const ticks = Math.min(6, n);
+    for (let i = 0; i < ticks; i++) {
+      const idx = n === 1 ? 0 : Math.round(i * (n - 1) / (ticks - 1));
+      const c = data[idx], xx = padL + (n > 1 ? idx * step : pw / 2);
+      g.fillStyle = FAINT; g.fillText(timeLabel(c.t), xx, padT + ph + 6);
+    }
+    // candles or flat line
+    if (n === 1) {
+      const c = data[0], yy = y(price(c.c));
+      g.strokeStyle = UP; g.lineWidth = 2; g.beginPath(); g.moveTo(padL, yy); g.lineTo(padL + pw, yy); g.stroke();
+    } else {
+      for (let i = 0; i < n; i++) {
+        const c = data[i], xx = padL + i * step;
+        const up = c.c >= c.o;
+        g.strokeStyle = g.fillStyle = up ? UP : DOWN; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(xx, y(price(c.h))); g.lineTo(xx, y(price(c.l))); g.stroke();
+        const yo = y(price(c.o)), yc = y(price(c.c));
+        const top = Math.min(yo, yc), bh = Math.max(1, Math.abs(yc - yo));
+        g.fillRect(xx - cw / 2, top, cw, bh);
+      }
+    }
+    // hover crosshair
+    if (hoverX != null && n > 1) {
+      const idx = Math.max(0, Math.min(n - 1, Math.round((hoverX - padL) / step)));
+      const c = data[idx], xx = padL + idx * step;
+      g.strokeStyle = FAINT; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(xx, padT); g.lineTo(xx, padT + ph); g.stroke(); g.setLineDash([]);
+      tip.style.display = 'block';
+      tip.style.left = Math.min(w - 190, Math.max(4, xx + 10)) + 'px';
+      tip.style.top = '8px';
+      tip.innerHTML = `${new Date(c.t * 1000).toLocaleString()}<br>O ${usd(price(c.o))} · H ${usd(price(c.h))}<br>L ${usd(price(c.l))} · C <span class="${c.c >= c.o ? 'up' : 'down'}">${usd(price(c.c))}</span><br>${Number(c.vEth).toFixed(4)} ETH vol`;
+    } else tip.style.display = 'none';
+  }
+  function fmtAxis(v) { return v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v >= 1 ? v.toFixed(2) : v >= 0.0001 ? v.toFixed(4) : v.toExponential(1); }
+  function timeLabel(ts) { const d = new Date(ts * 1000); const today = new Date(); return d.toDateString() === today.toDateString() ? d.toTimeString().slice(0, 5) : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + d.toTimeString().slice(0, 5); }
+  async function loadCandles() {
+    try { const d = await api('candles?token=' + t.token + '&interval=' + interval + '&limit=200');
+      candles = d.candles || []; ethUsd = d.ethUsd || 0;
+      if (!candles.length && cs.priceEth != null) candles = [{ t: Math.floor(Date.now() / 1000), o: cs.priceEth, h: cs.priceEth, l: cs.priceEth, c: cs.priceEth, vEth: 0 }];
+      drawChart();
+    } catch (e) { candles = []; drawChart(); }
+  }
+  document.getElementById('cseg').onclick = e => { const b = e.target.closest('button'); if (!b) return; interval = +b.dataset.i; for (const x of e.currentTarget.children) x.classList.toggle('on', x === b); loadCandles(); };
+  cv.addEventListener('mousemove', e => { hoverX = e.offsetX; drawChart(); });
+  cv.addEventListener('mouseleave', () => { hoverX = null; drawChart(); });
+  let raf = 0; new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(drawChart); }).observe(cv);
+  loadCandles(); setInterval(loadCandles, 15000);
+  // ---------- trade widget (unchanged logic)
   const tr = document.getElementById('trade');
   if (grad) { tr.innerHTML = `<div class="card"><div class="eyebrow">Trade</div><div class="notice" style="margin-top:.6rem">This token graduated. Trade it in the pool. <a href="${EXP}/address/${t.token}" target="_blank" rel="noopener">View on explorer ↗</a></div></div>`; return; }
   let side = 'buy'; let q = null;

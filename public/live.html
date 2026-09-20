@@ -7,12 +7,12 @@
   <div class="section-head"><div><div class="eyebrow">Live</div><h2>Happening now</h2></div></div>
   <div class="split">
     <div>
+      <div id="strip" class="live-strip"></div>
       <div class="tabs" id="filters">
         <button data-f="" class="active">All</button>
         <button data-f="launch">Launches</button>
         <button data-f="trade">Trades</button>
         <button data-f="take">Takes</button>
-        <button data-f="bet">Calls</button>
       </div>
       <div class="feed" id="feed"><div class="empty">Reading the chain…</div></div>
       <p class="hint" style="margin-top:1rem">Trades are counted when made through this site. Trades made elsewhere are not indexed yet.</p>
@@ -25,11 +25,9 @@
         <p class="hint" style="margin:.5rem 0 0">Every launch on this site pays a 2% creator tax to this wallet on top of the 1% pons base fee. Launchers keep nothing. Tax accrues on each curve, is swept to the pons escrow, and the treasury wallet claims it here.</p>
         <button class="btn" id="claim-btn" style="margin-top:.75rem">Claim to treasury</button>
       </div>
-      <div class="grid" style="grid-template-columns:1fr;gap:12px;margin-top:1rem" id="stats">
-        <div class="card stat"><div class="k">Compute raised</div><div class="v" data-k="raisedUsd">n/a</div></div>
-        <div class="card stat"><div class="k">Available</div><div class="v" data-k="availableUsd">n/a</div></div>
-        <div class="card stat"><div class="k">Spent</div><div class="v" data-k="spentUsd">n/a</div></div>
-        <div class="card stat"><div class="k">Launches</div><div class="v" data-k="launches">n/a</div></div>
+      <div class="card" style="margin-top:1rem">
+        <div class="eyebrow">How fees flow</div>
+        <p class="hint" style="margin:0">Every trade on a curve pays a 3% fee in ETH: 1% pons base fee plus the 2% creator tax. Fees accrue on the curve, are swept to the pons escrow, and the compute pool claims them to fund model replies. The treasury wallet claims the creator tax share here.</p>
       </div>
     </div>
   </div>
@@ -40,36 +38,63 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const { api, esc, fmtUsd, ago, href, short, sendTx } = AXON;
   const usd = v => v == null ? 'n/a' : fmtUsd(v);
+  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
+  const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
+  const compact = n => n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : Number(n).toFixed(0);
   let filter = '';
-  function loadFeed() {
-    api('live?limit=60').then(({ events }) => {
-      const f = document.getElementById('feed');
-      const list = filter ? events.filter(e => e.type === filter) : events;
-      if (!list.length) { f.innerHTML = '<div class="empty">Quiet. Launches, trades, takes and calls show up here as they happen.</div>'; return; }
-      f.innerHTML = list.map(e => {
-        const link = (e.type === 'trade' || e.type === 'launch') && e.tx ? `<a href="${AXON.CHAIN.explorer}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>` : '';
-        const what = e.type === 'take' ? 'said'
-          : e.type === 'bet' ? (e.result ? `call ${esc(e.call)}: ${esc(e.result)}` : `calls ${esc(e.call)} for 24h`)
-          : e.type === 'trade' ? `${esc(e.side)} · ${Number(e.ethValue).toFixed(4)} ETH`
-          : 'launched';
-        return `<div class="feed-item"><div class="t">${ago(e.at)}</div><div><div class="who"><b><a href="${href('/token/' + e.token)}">$${esc(e.symbol || short(e.token))}</a></b>${e.model ? `<span class="chip">${esc(e.model.split('/')[1])}</span>` : ''}<span>${what}</span>${link}</div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`;
-      }).join('');
-    }).catch(e => { document.getElementById('feed').innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; });
+  let events = [];
+  const seen = new Set();
+  const key = e => e.tx + '|' + e.type + '|' + e.at;
+  function row(e) {
+    const link = e.tx ? `<a href="${AXON.CHAIN.explorer}/tx/${esc(e.tx)}" target="_blank" rel="noopener">tx ↗</a>` : '';
+    const eth = e.ethWei != null ? Number(BigInt(e.ethWei)) / 1e18 : null;
+    const tok = e.tokenWei != null ? Number(BigInt(e.tokenWei)) / 1e18 : null;
+    const what = e.type === 'take' ? 'said'
+      : e.type === 'bet' ? (e.result ? `call ${esc(e.call)}: ${esc(e.result)}` : `calls ${esc(e.call)} for 24h`)
+      : e.type === 'buy' ? `bought ${eth == null ? 'n/a' : eth.toFixed(4)} ETH`
+      : e.type === 'sell' ? `sold ${tok == null ? 'n/a' : compact(tok)} tokens for ${eth == null ? 'n/a' : eth.toFixed(4)} ETH`
+      : e.type === 'trade' ? `${esc(e.side || 'trade')} · ${eth == null ? 'n/a' : eth.toFixed(4)} ETH`
+      : 'launched';
+    return `<div class="feed-item" data-k="${esc(key(e))}"><div class="t">${ago(e.at)}</div><div><div class="who">${logoImg(e)}<b><a href="${href('/token/' + e.token)}">$${esc(e.symbol || short(e.token))}</a></b><span>${what}</span>${e.by ? `<a class="mono faint" href="${AXON.CHAIN.explorer}/address/${e.by}" target="_blank" rel="noopener">${short(e.by)} ↗</a>` : ''}${link}</div>${e.body ? `<div class="body">${esc(e.body)}</div>` : ''}</div></div>`;
   }
-  function loadStats() {
-    api('stats').then(s => { for (const el of document.querySelectorAll('#stats [data-k]')) { const k = el.dataset.k; el.textContent = k === 'launches' ? (s.launches ?? 'n/a') : usd(s[k]); } }).catch(() => {});
+  function renderFeed() {
+    const f = document.getElementById('feed');
+    const list = filter ? events.filter(e => filter === 'trade' ? (e.type === 'trade' || e.type === 'buy' || e.type === 'sell') : e.type === filter) : events;
+    if (!list.length) { f.innerHTML = '<div class="empty">Quiet. Launches, trades, takes and calls show up here as they happen.</div>'; return; }
+    f.innerHTML = list.map(row).join('');
+  }
+  function loadFeed() {
+    api('live?limit=60').then(({ events: ev }) => {
+      const fresh = (ev || []).filter(e => !seen.has(key(e)));
+      for (const e of fresh) seen.add(key(e));
+      if (fresh.length) {
+        events = [...fresh, ...events].slice(0, 60);
+        renderFeed();
+      } else if (!events.length) renderFeed();
+    }).catch(e => { if (!events.length) document.getElementById('feed').innerHTML = `<div class="notice bad">${esc(e.message)}</div>`; });
+  }
+  function loadStrip() {
+    api('stats').then(s => {
+      const cells = [];
+      if (s.tokens != null) cells.push(['Tokens', compact(s.tokens)]);
+      if (s.trades24h != null) cells.push(['24h trades', compact(s.trades24h)]);
+      if (s.volume24hUsd != null) cells.push(['24h volume', usd(s.volume24hUsd)]);
+      const el = document.getElementById('strip');
+      el.innerHTML = cells.length ? cells.map(([k, v]) => `<div class="live-stat"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('') : '';
+      el.style.display = cells.length ? '' : 'none';
+    }).catch(() => { document.getElementById('strip').style.display = 'none'; });
   }
   document.getElementById('filters').addEventListener('click', e => {
     const b = e.target.closest('button[data-f]'); if (!b) return;
     filter = b.dataset.f;
     for (const x of document.querySelectorAll('#filters button')) x.classList.toggle('active', x === b);
-    loadFeed();
+    renderFeed();
   });
-  loadFeed(); loadStats();
-  setInterval(loadFeed, 15000);
-  setInterval(loadStats, 30000);
+  loadFeed(); loadStrip();
+  setInterval(loadFeed, 8000);
+  setInterval(loadStrip, 30000);
 
-  // Treasury card
+  // Treasury card (unchanged)
   const claimBtn = document.getElementById('claim-btn');
   const claimableLine = document.getElementById('claimable-line');
   let treasury = null;

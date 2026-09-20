@@ -11,7 +11,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
   const { api, esc, fmtUsd, ago, short, href } = AXON; const usd = v => v == null ? 'n/a' : fmtUsd(v);
-  const node = t => `<a class="node" href="${href('/token/' + t.token)}">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">$${esc(t.symbol || '?')} · ${esc(t.modelName || 'no model')} · ${usd(t.marketCapUsd)} · ${ago(t.launchedAt)}</span></span></a>`;
+  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
+  const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
+  const node = t => `<a class="node" href="${href('/token/' + t.token)}">${logoImg(t)}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">$${esc(t.symbol || '?')} · ${esc(t.modelName || 'no model')} · ${usd(t.marketCapUsd)} · ${ago(t.launchedAt)}</span></span></a>`;
   const g = document.getElementById('grid');
   try { const { offspring } = await api('offspring');
     g.innerHTML = offspring.length ? offspring.map(o => `<div class="card"><div class="eyebrow" style="margin-bottom:10px">${short(o.child.deployer)} · <a href="${AXON.CHAIN.explorer}/address/${o.child.deployer}" target="_blank" rel="noopener">wallet ↗</a></div><div class="lineage">${node(o.parent)}<span class="arrow">→</span>${node(o.child)}</div></div>`).join('') : '<div class="empty" style="grid-column:1/-1">No offspring yet. It takes a wallet launching twice.</div>';

@@ -11,11 +11,16 @@
     <button data-sort="volume">Volume</button>
     <button data-sort="graduation">Graduation</button>
   </div>
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
     <select id="f-model" class="sel"><option value="">All models</option></select>
     <select id="f-status" class="sel"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
+    <div id="view-toggle" class="seg" style="margin-left:auto">
+      <button id="view-cards" class="on" title="Cards">Cards</button>
+      <button id="view-rows" title="Rows">Rows</button>
+    </div>
   </div>
-  <div class="table-wrap"><table class="table"><thead><tr><th>Token</th><th>Backs</th><th class="num">Price</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="faint">Reading the chain…</td></tr></tbody></table></div>
+  <div id="cards" class="mkt-grid"></div>
+  <div class="table-wrap" id="table" style="display:none"><table class="table"><thead><tr><th>Token</th><th>Backs</th><th class="num">Price</th><th class="num">Mkt cap</th><th class="num">24h vol</th><th>Graduation</th><th class="num">Age</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="8" class="faint">Reading the chain…</td></tr></tbody></table></div>
 </section>
 </div></main>
 <footer class="footer" id="footer"></footer>
@@ -23,20 +28,51 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const { api, esc, fmtUsd, ago, pct, href, short } = AXON;
   const usd = v => v == null ? 'n/a' : fmtUsd(v);
+  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
+  const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
   let sort = 'new', model = '', status = '';
+  let view = localStorage.getItem('axon.marketsView') === 'rows' ? 'rows' : 'cards';
+  let tokens = [];
   api('models').then(({ models }) => {
     const sel = document.getElementById('f-model');
     for (const m of models) { const o = document.createElement('option'); o.value = m.id; o.textContent = m.name; sel.appendChild(o); }
   }).catch(() => {});
+  function card(t) {
+    return `<a class="mkt-card" href="${href('/token/' + t.token)}">
+      <div class="mkt-head">${logoImg(t)}<div class="mkt-name"><span class="n">${esc(t.name || short(t.token))}</span><span class="chip">${esc(t.symbol || '?')}</span></div></div>
+      <div class="mkt-sub"><span class="mono">${usd(t.marketCapUsd)}</span>${t.modelName ? `<span class="chip mint">${esc(t.modelName)}</span>` : '<span class="chip">no model</span>'}</div>
+      <div class="mkt-stats"><span>Price <b>${usd(t.priceUsd)}</b></span><span>24h vol <b>${usd(t.volume24hUsd)}</b></span></div>
+      <div class="mkt-grad"><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span><span class="mono faint">${pct(t.graduation)}</span></div>
+      <div class="mkt-foot"><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${esc(t.status)}</span><span class="faint">${ago(t.launchedAt)} ago</span></div>
+    </a>`;
+  }
+  function render() {
+    const cards = document.getElementById('cards'), table = document.getElementById('table');
+    const isCards = view === 'cards';
+    cards.style.display = isCards ? '' : 'none';
+    table.style.display = isCards ? 'none' : '';
+    document.getElementById('view-cards').classList.toggle('on', isCards);
+    document.getElementById('view-rows').classList.toggle('on', !isCards);
+    if (!tokens.length) {
+      cards.innerHTML = '<div class="empty" style="grid-column:1/-1">Nothing here. A token address is the only identifier that cannot be copied.</div>';
+      document.getElementById('rows').innerHTML = '<tr><td colspan="8"><div class="empty">Nothing here. A token address is the only identifier that cannot be copied.</div></td></tr>';
+      return;
+    }
+    cards.innerHTML = tokens.map(card).join('');
+    document.getElementById('rows').innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${logoImg(t)}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || 'n/a')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${usd(t.volume24hUsd)}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${esc(t.status)}</span></td></tr>`).join('');
+  }
   function load() {
     const q = new URLSearchParams({ sort, limit: '50' });
     if (model) q.set('model', model);
     if (status) q.set('status', status);
-    api('tokens?' + q).then(({ tokens }) => {
-      const tb = document.getElementById('rows');
-      if (!tokens.length) { tb.innerHTML = `<tr><td colspan="8"><div class="empty">Nothing here. A token address is the only identifier that cannot be copied.</div></td></tr>`; return; }
-      tb.innerHTML = tokens.map(t => `<tr onclick="location.href='${href('/token/' + t.token)}'" style="cursor:pointer"><td><div class="tok">${t.logo ? `<img class="logo" src="${esc(t.logo)}" alt="">` : '<span class="logo"></span>'}<span><span class="n">${esc(t.name || short(t.token))}</span><br><span class="s">${esc(t.symbol || '?')} · ETH</span></span></div></td><td>${esc(t.modelName || 'n/a')}</td><td class="num">${usd(t.priceUsd)}</td><td class="num">${usd(t.marketCapUsd)}</td><td class="num">${t.trades24h ? usd(t.volume24hUsd) : 'n/a'}</td><td><span class="bar"><i style="width:${Math.round((t.graduation || 0) * 100)}%"></i></span>${pct(t.graduation)}</td><td class="num">${ago(t.launchedAt)}</td><td><span class="chip ${t.status === 'Graduated' ? 'up' : ''}">${esc(t.status)}</span></td></tr>`).join('');
-    }).catch(e => { document.getElementById('rows').innerHTML = `<tr><td colspan="8" class="down">${esc(e.message)}</td></tr>`; });
+    api('tokens?' + q).then(d => {
+      tokens = d.tokens || [];
+      render();
+    }).catch(e => {
+      tokens = [];
+      document.getElementById('cards').innerHTML = `<div class="notice bad" style="grid-column:1/-1">${esc(e.message)}</div>`;
+      document.getElementById('rows').innerHTML = `<tr><td colspan="8" class="down">${esc(e.message)}</td></tr>`;
+    });
   }
   document.getElementById('sorts').addEventListener('click', e => {
     const b = e.target.closest('button[data-sort]'); if (!b) return;
@@ -46,6 +82,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('f-model').addEventListener('change', e => { model = e.target.value; load(); });
   document.getElementById('f-status').addEventListener('change', e => { status = e.target.value; load(); });
+  document.getElementById('view-toggle').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    view = b.id === 'view-rows' ? 'rows' : 'cards';
+    localStorage.setItem('axon.marketsView', view);
+    render();
+  });
   load();
   setInterval(load, 30000);
 });
