@@ -5,18 +5,20 @@
 <main class="page"><div class="wrap">
 <section class="section">
   <div class="section-head"><div><div class="eyebrow">Markets</div><h2>Every launch, priced live.</h2></div><a href="leaderboard">Leaderboards →</a></div>
-  <div class="tabs" id="sorts">
-    <button data-sort="new" class="active">New</button>
-    <button data-sort="mcap">Market cap</button>
-    <button data-sort="volume">Volume</button>
-    <button data-sort="graduation">Graduation</button>
-  </div>
-  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
-    <select id="f-model" class="sel"><option value="">All models</option></select>
-    <select id="f-status" class="sel"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
-    <div id="view-toggle" class="seg" style="margin-left:auto">
-      <button id="view-cards" class="on" title="Cards">Cards</button>
-      <button id="view-rows" title="Rows">Rows</button>
+  <div class="mkt-controls">
+    <div class="tabs" id="sorts">
+      <button data-sort="new" class="active">New</button>
+      <button data-sort="mcap">Market cap</button>
+      <button data-sort="volume">Volume</button>
+      <button data-sort="graduation">Graduation</button>
+    </div>
+    <div class="mkt-filters">
+      <select id="f-model" class="sel"><option value="">All models</option></select>
+      <select id="f-status" class="sel"><option value="">All statuses</option><option value="curve">Curve</option><option value="graduated">Graduated</option></select>
+      <div id="view-toggle" class="seg">
+        <button id="view-cards" class="on" title="Cards">Cards</button>
+        <button id="view-rows" title="Rows">Rows</button>
+      </div>
     </div>
   </div>
   <div id="cards" class="mkt-grid"></div>
