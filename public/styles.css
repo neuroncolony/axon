@@ -351,4 +351,12 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .cap.is-blur:hover{filter:blur(0);opacity:1;z-index:2}
 @media(prefers-reduced-motion:reduce){.cap{transition:none}}
 
-.devbuy{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.devbuy .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--wash);color:var(--ink);font:500 .85rem var(--font-head);cursor:pointer;transition:background .25s var(--ease),color .25s var(--ease)}.devbuy .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}.devbuy input{width:140px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);font-size:.85rem}
+.devbuy{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.devbuy .chip{height:38px;padding:0 16px;border-radius:999px;border:1px solid rgba(0,181,67,.22);background:var(--green-wash);color:var(--green-ink);font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:-.01em;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);transition:background .3s var(--ease),color .3s var(--ease),border-color .3s var(--ease),transform .3s var(--ease),box-shadow .3s var(--ease)}
+.devbuy .chip:hover{background:rgba(0,181,67,.18);border-color:rgba(0,181,67,.38);transform:translateY(-1px)}
+.devbuy .chip.on{background:var(--green);color:#fff;border-color:var(--green);box-shadow:var(--chip-gloss),0 10px 20px -12px rgba(0,181,67,.7)}
+.devbuy .chip.on:hover{background:#00a53d;color:#fff}
+.devbuy input{width:150px;height:38px;padding:0 14px;border-radius:999px;border:1px solid rgba(0,181,67,.22);background:rgba(0,181,67,.06);color:var(--green-ink);font-family:var(--mono);font-size:13px;outline:0;box-shadow:none;transition:box-shadow .3s var(--ease),background .3s var(--ease),border-color .3s var(--ease)}
+.devbuy input::placeholder{color:rgba(15,122,58,.55)}
+.devbuy input:focus{background:#fff;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,181,67,.18)}
+.devbuy input::-webkit-outer-spin-button,.devbuy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.devbuy input[type=number]{-moz-appearance:textfield}
