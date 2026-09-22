@@ -413,3 +413,13 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 }
 .keys-split{grid-template-columns:1fr 22rem}@media(max-width:640px){.keys-split{grid-template-columns:1fr!important}}
 @media(max-width:640px){.docs .prose{margin:0;width:100%;max-width:100%}.docs{gap:1rem}}
+/* phone only: readable menu, tidy hero capsules */
+@media(max-width:640px){
+  .nav-mobile{background:rgba(255,255,255,.94)!important;backdrop-filter:blur(40px) saturate(160%)!important;-webkit-backdrop-filter:blur(40px) saturate(160%)!important;box-shadow:0 0 0 1px rgba(11,26,51,.08),0 24px 48px -24px rgba(11,26,51,.45)}
+  .nav-mobile a{color:var(--ink)}
+  .hero{display:flex;flex-direction:column;align-items:stretch}
+  .hero-bg{order:0}.hero-in{order:1}
+  .hero-caps{order:2;position:static;inset:auto;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px;margin:28px 14px 0;pointer-events:auto}
+  .hero-caps .cap{position:static;top:auto;bottom:auto;left:auto;right:auto;rotate:0deg;animation:none;filter:none!important;opacity:1!important;height:38px;font-size:12px;padding:0 14px 0 6px;gap:7px}
+  .hero-caps .cap-2,.hero-caps .cap-4,.hero-caps .cap-6,.hero-caps .cap-8{display:none}
+}
