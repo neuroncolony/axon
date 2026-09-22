@@ -409,7 +409,10 @@ def offspring():
     px = eth_usd(); ts = _trade_stats()
     out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in _ours() if first[r['deployer'].lower()]['token'] != r['token']]
     return sorted(out, key=lambda o: -o['child'].get('launchedAt', 0))
-POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
+def release_eth():
+    """Cumulative ETH moved from the compute reserve to the owner share. Read live so a Railway change applies without a restart."""
+    try: return float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)
+    except ValueError: return 0.0
 def fee_inflow_eth():
     """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
     wei = 0
@@ -420,7 +423,7 @@ def fee_inflow_eth():
     return wei / 1e18
 def _split():
     inflow = fee_inflow_eth()
-    reserve = max(0.0, inflow * POOL_SHARE - POOL_RELEASE_ETH)
+    reserve = max(0.0, inflow * POOL_SHARE - release_eth())
     owner = inflow - reserve
     return inflow, reserve, owner
 def stats():
@@ -437,7 +440,7 @@ def owner_view():
     bal = int(tb['balanceWei']) / 1e18 if tb['balanceWei'] else None
     return {'treasury': tb['treasury'], 'walletEth': bal, 'feeInflowEth': inflow, 'ownerShareEth': owner, 'ownerShareUsd': owner * px if px else None,
             'reserveEth': reserve, 'reserveUsd': reserve * px if px else None, 'spentUsd': spent_usd(), 'spentEth': spent_eth,
-            'reserveLeftUsd': (reserve * px - spent_usd()) if px else None, 'releasedEth': POOL_RELEASE_ETH, 'ethUsd': px}
+            'reserveLeftUsd': (reserve * px - spent_usd()) if px else None, 'releasedEth': release_eth(), 'ethUsd': px}
 def entitlement(address):
     a = address.lower(); owned = [r for r in _ours() if r['deployer'].lower() == a]
     return {'hasLaunched': bool(owned), 'launches': [{'token': r['token'], 'symbol': r.get('symbol'), 'model': r.get('model')} for r in owned],
