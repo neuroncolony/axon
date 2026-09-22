@@ -423,3 +423,18 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
   .hero-caps .cap{position:static;top:auto;bottom:auto;left:auto;right:auto;rotate:0deg;animation:none;filter:none!important;opacity:1!important;height:38px;font-size:12px;padding:0 14px 0 6px;gap:7px}
   .hero-caps .cap-2,.hero-caps .cap-4,.hero-caps .cap-6,.hero-caps .cap-8{display:none}
 }
+
+/* entry gate */
+html.gated{overflow:hidden}
+.modal.gate{z-index:200;background:rgba(11,26,51,.42);backdrop-filter:blur(18px) saturate(140%);-webkit-backdrop-filter:blur(18px) saturate(140%)}
+.modal.gate.out{animation:fade .3s var(--ease) reverse forwards}
+.gate-card{max-width:460px;text-align:left}
+.gate-card .modal-title{margin-right:0}
+.gate-mark{width:44px;height:44px;margin-bottom:16px;color:var(--ink)}.gate-mark svg{width:44px;height:44px;display:block}
+.gate-card p{margin:0 0 12px;font-size:15px;line-height:1.55;color:var(--ink-80)}
+.gate-card p a{color:var(--blue);text-decoration:underline;text-underline-offset:3px}
+.gate-card .gate-cookie{padding:10px 12px;border-radius:12px;background:var(--wash);font-size:13.5px;color:var(--muted)}
+.gate-card .gate-cookie code{font-family:var(--mono);font-size:12.5px;padding:1px 5px;border-radius:5px;background:#fff}
+.gate-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.gate-actions .btn{height:46px;font-size:16px}
+@media(max-width:640px){.gate-actions{flex-direction:column-reverse}.gate-actions .btn{width:100%}.modal.gate{background:rgba(255,255,255,.55);backdrop-filter:blur(40px) saturate(160%);-webkit-backdrop-filter:blur(40px) saturate(160%)}}

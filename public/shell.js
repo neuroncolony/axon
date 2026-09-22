@@ -41,6 +41,29 @@ window.AXON = (() => {
   const pct = x => x == null ? '...' : (x*100).toFixed(x*100 < 10 ? 1 : 0) + '%';
   function toast(m, ms=3200) { const t = document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
 
+  // ---------- entry gate (terms + cookies). Must be accepted before using the site.
+  (function gate() {
+    const KEY = 'axon_consent', EXIT = 'https://www.ponsfamily.com';
+    const has = () => document.cookie.split(';').some(c => c.trim().startsWith(KEY + '=1')) || localStorage.getItem(KEY) === '1';
+    if (has()) return;
+    const accept = () => { document.cookie = KEY + '=1; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); localStorage.setItem(KEY, '1'); m.classList.add('out'); document.documentElement.classList.remove('gated'); setTimeout(() => m.remove(), 320); };
+    const leave = () => { location.replace(EXIT); };
+    const m = document.createElement('div'); m.className = 'modal gate'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+    m.innerHTML = `<div class="card modal-card gate-card">
+      <div class="gate-mark">${MARK}</div>
+      <h2 class="modal-title">Before you enter</h2>
+      <p>axon is a token launcher on Robinhood Chain. Tokens launched here are experimental, unaudited by any third party, and can go to zero. Nothing on this site is financial advice. Trades are on-chain and cannot be reversed.</p>
+      <p>By entering you confirm you are of legal age where you live, you are not in a restricted jurisdiction, and you accept the <a href="/docs#limits">honest limits</a> of this product.</p>
+      <p class="gate-cookie">We set one first-party cookie (<code>axon_consent</code>) to remember this choice for a year. No trackers, no third-party analytics.</p>
+      <div class="gate-actions"><button class="btn ghost" data-leave>I do not accept</button><button class="btn accent" data-accept>Accept and enter</button></div>
+    </div>`;
+    m.addEventListener('click', e => { if (e.target.closest('[data-accept]')) accept(); else if (e.target.closest('[data-leave]')) leave(); });
+    m.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); } });
+    document.documentElement.classList.add('gated');
+    const mount = () => { document.body.appendChild(m); m.querySelector('[data-accept]').focus(); };
+    document.body ? mount() : document.addEventListener('DOMContentLoaded', mount);
+  })();
+
   // ---------- wallet
   window.addEventListener('eip6963:announceProvider', e => { if (!state.wallets.find(w => w.info.uuid === e.detail.info.uuid)) state.wallets.push(e.detail); });
   window.dispatchEvent(new Event('eip6963:requestProvider'));
