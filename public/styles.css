@@ -522,15 +522,29 @@ html[data-theme=dev]{scroll-behavior:auto}
 
 .dev-gate .gate-card{max-width:520px}
 .dev-warnbox{margin:14px 0 4px;padding:14px 16px;border-radius:14px;background:var(--wash);border:1px solid var(--line)}
-.dev-warnbox b{display:block;margin-bottom:8px;font-size:14px}
+.dev-warnbox > b{display:block;margin-bottom:8px;font-size:14px}
 .dev-warnbox ul{margin:0;padding-left:18px}
 .dev-warnbox li{margin:0 0 6px;font-size:14px;line-height:1.5;color:var(--ink-80)}
+.dev-warnbox li b{display:inline;font-weight:700}
+.dev-gate .gate-card p b,.dev-warnbox li b{color:#ffd23a;animation:devflash 1.5s ease-in-out infinite}
+@keyframes devflash{0%,100%{color:#ffd23a}50%{color:#fff}}
 .dev-card{max-width:440px}
 .dev-note{margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--ink-80)}
-.dev-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
-.dev-row span{color:var(--muted)}
-.dev-fund{display:flex;gap:8px;margin:14px 0 4px}
-.dev-fund .inp{flex:1;min-width:0}
+.dev-rows{margin:4px 0 2px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.dev-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:11px 14px;font-size:14px}
+.dev-row + .dev-row{border-top:1px solid var(--line)}
+.dev-row .k{color:var(--muted);flex:none}
+.dev-row .v{color:var(--ink);font-weight:500;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev-row .v .mono{font-family:var(--mono);font-weight:400;letter-spacing:.02em}
+.dev-fund{display:flex;align-items:flex-end;gap:10px;margin:14px 0 4px}
+.dev-fund .dev-amt{flex:1;min-width:0;margin:0}
+.dev-fund .dev-amt span{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.dev-fund .dev-amt input{height:44px}
+.dev-fund .btn{flex:none;height:44px}
+.dev-card .gate-actions{display:flex;gap:10px;margin-top:14px}
+.dev-card .gate-actions .btn{flex:1;height:44px;font-size:15px}
 .dev-warn{margin:14px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
 .dev-chip{display:grid;place-items:center;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:2px;background:transparent;color:var(--ink);font-family:var(--mono);font-size:13px;cursor:pointer}
 .dev-chip:hover{background:var(--wash)}
+
+html[data-theme=dev] .dev-gate .gate-card p b,html[data-theme=dev] .dev-warnbox li b{animation:devflash 1.5s ease-in-out infinite!important}

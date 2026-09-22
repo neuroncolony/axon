@@ -148,13 +148,15 @@ window.AXON = (() => {
   async function devPanel() {
     const c = await devClients(true);
     const m = document.createElement('div'); m.className = 'modal dev-panel';
-    const row = (k, v) => `<div class="dev-row"><span>${k}</span><b>${v}</b></div>`;
+    const row = (k, v) => `<div class="dev-row"><span class="k">${k}</span><span class="v">${v}</span></div>`;
     m.innerHTML = `<div class="card modal-card dev-card"><button class="modal-x" data-x aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2"/></svg></button>
       <h2 class="modal-title">Dev key</h2>
       <p class="dev-note">Every on-chain action in dev mode is signed by this key, with no wallet prompt. It spends real ETH on chain ${CHAIN.id}.</p>
+      <div class="dev-rows">
       ${row('Address', `<span class="mono">${short(c.account.address)}</span>`)}
       ${row('Balance', `<span class="mono" data-bal>checking…</span>`)}
-      <div class="dev-fund"><input class="inp" data-amt type="text" inputmode="decimal" value="0.01" aria-label="Amount in ETH"><button class="btn accent" data-fund>Fund from my wallet</button></div>
+      </div>
+      <div class="dev-fund"><label class="field dev-amt"><span>Amount in ETH</span><input data-amt type="text" inputmode="decimal" value="0.01"></label><button class="btn accent" data-fund>Fund from my wallet</button></div>
       <div class="gate-actions"><button class="btn ghost" data-drain>Send it all back</button><button class="btn ghost" data-copy>Copy private key</button></div>
       <p class="dev-warn">Anyone with access to this browser can spend this key. Keep only what you are willing to lose.</p></div>`;
     document.body.appendChild(m);
@@ -245,6 +247,16 @@ window.AXON = (() => {
     renderNav(); return session;
   }
   async function me() { if (session) return session; try { const r = await api('auth/me'); session = r?.address ? r : null; if (session && !state.address) state.address = session.address; } catch { session = null; } return session; }
+
+  // ---------- address resolution + raw RPC (works with no injected wallet)
+  async function devAddress(){ try { const c = await devClients(false); return c ? c.account.address : null; } catch(e){ return null; } }
+  async function rpcCall(to, data){
+    const r = await fetch(CHAIN.rpc, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ jsonrpc:'2.0', id:1, method:'eth_call', params:[{ to, data }, 'latest'] }) });
+    const j = await r.json();
+    if (j.error) throw Error(j.error.message || 'RPC call failed.');
+    return j.result;
+  }
+  async function activeAddress(){ if (devOn()) { const a = await devAddress(); if (a) return a; } if (state.address) return state.address; const m = await me().catch(()=>null); return (m && m.address) || null; }
 
   // ---------- nav / footer
   function renderNav() {
@@ -443,5 +455,5 @@ window.AXON = (() => {
   }
 
   document.addEventListener('DOMContentLoaded', () => { devGate(); renderNav(); autoReconnect(); fancySelects(); new MutationObserver(()=>fancySelects()).observe(document.body,{childList:true,subtree:true}); });
-  return { devPanel, devBalance, devOn, BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, fancySelects, openWalletModal, ensureChain, sendTx, login, me, renderNav, official, officialCard, officialRow, setTheme, isDev };
+  return { devPanel, devBalance, devOn, BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, fancySelects, openWalletModal, ensureChain, sendTx, login, me, renderNav, official, officialCard, officialRow, setTheme, isDev, devAddress, rpcCall, activeAddress };
 })();
