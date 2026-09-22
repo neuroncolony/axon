@@ -72,7 +72,7 @@ def _purge_foreign():
         if r is None:
             try: r = chain.launched(rec['token'])['creatorFeeRecipient']; rec['creatorFeeRecipient'] = r
             except Exception: continue
-        if r.lower() != t: TOKENS.pop(k, None); gone += 1
+        if r.lower() != t and k != (official.official()['token'] or ''): TOKENS.pop(k, None); gone += 1
     if gone: store.save('tokens')
     return gone
 
@@ -207,6 +207,15 @@ def _ours():
             except Exception:
                 continue
         if (fr or '').lower() == t: out.append(r)
+    off = official.official()['token']
+    if off and not hidden.is_hidden(off) and not any(r['token'].lower() == off for r in out):
+        rec = TOKENS.get(off)
+        if not rec:
+            try:
+                snap = chain.token_snapshot(off); rec = _record(snap); rec['creatorFeeRecipient'] = snap.get('creatorFeeRecipient'); rec['official'] = True
+                TOKENS[off] = rec; dirty = True
+            except Exception: rec = None
+        if rec: out.append(rec)
     if dirty: store.save('tokens')
     return out
 def token_list(sort='new', model=None, status=None, limit=50):
@@ -227,7 +236,7 @@ def token_detail(addr):
     rec = TOKENS.get(addr.lower())
     if not rec:
         snap = chain.token_snapshot(addr)
-        if not snap['fundedByAxon']: raise PoolError('Not an axon launch. It is a pons v2 token, but its creator fee goes elsewhere.')
+        if not snap['fundedByAxon'] and addr.lower() != (official.official()['token'] or ''): raise PoolError('Not an axon launch. It is a pons v2 token, but its creator fee goes elsewhere.')
         rec = _record(snap); TOKENS[rec['token'].lower()] = rec; store.save('tokens')
     elif store.now() - rec.get('updatedAt', 0) > 30:
         try:
