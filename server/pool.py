@@ -224,12 +224,14 @@ def token_list(sort='new', model=None, status=None, limit=50):
     if model: rows = [r for r in rows if r.get('model') == model]
     if status: rows = [r for r in rows if r['status'].lower() == status.lower()]
     key = {'mcap': lambda r: -(r.get('marketCapUsd') or 0), 'volume': lambda r: -(r.get('volume24hUsd') or 0), 'graduation': lambda r: -(r.get('graduation') or 0)}.get(sort, lambda r: -r.get('launchedAt', 0))
-    rows = sorted(rows, key=key)[:limit]
     off = official.official()['token']
-    if off:
-        i = next((j for j, r in enumerate(rows) if r['token'].lower() == off), None)
-        if i is not None:
-            rows.insert(0, rows.pop(i)); rows[0]['official'] = True
+    # the official token is pinned first on every list, whatever the sort, filter or limit
+    pinned = next((r for r in rows if r['token'].lower() == off), None) if off else None
+    if off and pinned is None and not hidden.is_hidden(off):
+        pinned = next((enrich(r, px, ts) for r in _ours() if r['token'].lower() == off), None)
+    rows = [r for r in rows if r['token'].lower() != off]
+    rows = sorted(rows, key=key)[:limit]
+    if pinned: pinned['official'] = True; rows.insert(0, pinned)
     return rows
 def token_detail(addr):
     if hidden.is_hidden(addr): raise PoolError('This token is not listed on axon.')
