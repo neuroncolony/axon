@@ -110,8 +110,123 @@ window.AXON = (() => {
     }
     state.chainId = c;
   }
+  // ---------- dev mode: one signature at entry, then a local key signs everything
+  const DEV_ACK = 'axon.dev.ack', DEV_SK = 'axon.dev.sk';
+  const devSk = () => { try { return localStorage.getItem(DEV_SK); } catch (e) { return null; } };
+  const devOn = () => isDev() && !!devSk();
+  let _v = null;
+  async function viem() {
+    if (_v) return _v;
+    const [core, acct] = await Promise.all([import('https://esm.sh/viem@2.21.4'), import('https://esm.sh/viem@2.21.4/accounts')]);
+    _v = { ...core, ...acct }; return _v;
+  }
+  const DEV_CHAIN = { id: CHAIN.id, name: CHAIN.name, nativeCurrency: { name:'Ether', symbol:'ETH', decimals:18 }, rpcUrls:{ default:{ http:[CHAIN.rpc] } } };
+  async function devClients(create) {
+    const v = await viem();
+    let sk = devSk();
+    if (!sk) {
+      if (!create) return null;
+      sk = '0x' + [...crypto.getRandomValues(new Uint8Array(32))].map(b => b.toString(16).padStart(2,'0')).join('');
+      localStorage.setItem(DEV_SK, sk);
+    }
+    const account = v.privateKeyToAccount(sk);
+    return { v, account,
+      pub: v.createPublicClient({ chain: DEV_CHAIN, transport: v.http(CHAIN.rpc) }),
+      wal: v.createWalletClient({ account, chain: DEV_CHAIN, transport: v.http(CHAIN.rpc) }) };
+  }
+  async function devBalance() { try { const c = await devClients(false); if (!c) return null; return await c.pub.getBalance({ address: c.account.address }); } catch (e) { return null; } }
+  async function devSend(tx) {
+    const c = await devClients(false); if (!c) throw Error('No dev key on this browser.');
+    const bal = await c.pub.getBalance({ address: c.account.address });
+    if (bal <= BigInt(tx.value)) throw Error('The dev key is out of ETH. Top it up from the dev panel.');
+    const hash = await c.wal.sendTransaction({ to: tx.to, data: tx.data, value: BigInt(tx.value) });
+    toast('Sent from the dev key. No signature asked.');
+    const r = await c.pub.waitForTransactionReceipt({ hash });
+    if (r.status !== 'success') throw Error('The transaction reverted on-chain.');
+    return { hash, receipt: r };
+  }
+  async function devPanel() {
+    const c = await devClients(true);
+    const m = document.createElement('div'); m.className = 'modal dev-panel';
+    const row = (k, v) => `<div class="dev-row"><span>${k}</span><b>${v}</b></div>`;
+    m.innerHTML = `<div class="card modal-card dev-card"><button class="modal-x" data-x aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" stroke-width="2"/></svg></button>
+      <h2 class="modal-title">Dev key</h2>
+      <p class="dev-note">Every on-chain action in dev mode is signed by this key, with no wallet prompt. It spends real ETH on chain ${CHAIN.id}.</p>
+      ${row('Address', `<span class="mono">${short(c.account.address)}</span>`)}
+      ${row('Balance', `<span class="mono" data-bal>checking…</span>`)}
+      <div class="dev-fund"><input class="inp" data-amt type="text" inputmode="decimal" value="0.01" aria-label="Amount in ETH"><button class="btn accent" data-fund>Fund from my wallet</button></div>
+      <div class="gate-actions"><button class="btn ghost" data-drain>Send it all back</button><button class="btn ghost" data-copy>Copy private key</button></div>
+      <p class="dev-warn">Anyone with access to this browser can spend this key. Keep only what you are willing to lose.</p></div>`;
+    document.body.appendChild(m);
+    const setBal = async () => { const b = await devBalance(); const el = m.querySelector('[data-bal]'); if (el) el.textContent = b === null ? 'unreachable' : (Number(b) / 1e18).toFixed(5) + ' ETH'; };
+    setBal();
+    m.onclick = async e => {
+      if (e.target === m || e.target.closest('[data-x]')) return m.remove();
+      try {
+        if (e.target.closest('[data-copy]')) { await navigator.clipboard.writeText(devSk()); return toast('Private key copied.'); }
+        if (e.target.closest('[data-fund]')) {
+          if (!state.address) await openWalletModal();
+          await ensureChain();
+          const eth = Number(m.querySelector('[data-amt]').value); if (!(eth > 0)) throw Error('Enter an amount.');
+          const val = '0x' + BigInt(Math.round(eth * 1e18)).toString(16);
+          await state.provider.request({ method:'eth_sendTransaction', params:[{ from: state.address, to: c.account.address, value: val }] });
+          toast('Funding sent. Balance updates in a few seconds.'); setTimeout(setBal, 6000); return;
+        }
+        if (e.target.closest('[data-drain]')) {
+          if (!state.address) await openWalletModal();
+          const bal = await c.pub.getBalance({ address: c.account.address });
+          const gp = await c.pub.getGasPrice(); const fee = gp * 21000n * 2n;
+          if (bal <= fee) throw Error('Not enough left to cover gas.');
+          const hash = await c.wal.sendTransaction({ to: state.address, value: bal - fee });
+          toast('Sent back to your wallet.'); await c.pub.waitForTransactionReceipt({ hash }); setBal(); return;
+        }
+      } catch (err) { toast(err.message || 'That did not go through.'); }
+    };
+  }
+  function devGate() {
+    if (!isDev()) return;
+    try { if (localStorage.getItem(DEV_ACK) === '1') return; } catch (e) { return; }
+    const m = document.createElement('div'); m.className = 'modal gate dev-gate'; m.setAttribute('role','dialog'); m.setAttribute('aria-modal','true');
+    m.innerHTML = `<div class="card modal-card gate-card">
+      <h2 class="modal-title">Dev mode</h2>
+      <p>Dev mode is the fast lane. No animation, no video, no chrome, and no wallet prompt between you and the chain.</p>
+      <p>You sign <b>once</b> when you turn it on. That single signature opens your session across the whole site, so nothing asks you to sign in again.</p>
+      <p>After that, axon creates a <b>dev key inside this browser</b>. You fund it from your wallet, and every launch, buy and sell is signed by that key on its own.</p>
+      <div class="dev-warnbox"><b>Read this before you accept.</b><ul>
+        <li>Transactions go through with <b>no confirmation step</b>. A click is the whole flow.</li>
+        <li>It spends <b>real ETH</b> on chain ${CHAIN.id}. Nothing here is a testnet.</li>
+        <li>The dev key sits in this browser's storage. Anyone on this machine can drain it. It is not backed up.</li>
+        <li>Mistakes are final. There is no confirm dialog to catch a wrong click and no way to reverse a transaction.</li>
+        <li>Fund it with small amounts only. Send the rest back when you are done.</li>
+      </ul></div>
+      <div class="gate-actions"><button class="btn ghost" data-no>Leave dev mode</button><button class="btn accent" data-yes>I understand, enable it</button></div>
+    </div>`;
+    m.addEventListener('click', async e => {
+      if (e.target.closest('[data-no]')) { m.remove(); return setTheme(false); }
+      if (!e.target.closest('[data-yes]')) return;
+      localStorage.setItem(DEV_ACK, '1'); m.remove();
+      try {
+        if (!state.address) await openWalletModal();
+        await login();
+        await devPanel();
+      } catch (err) { toast(err.message || 'Connect a wallet to finish setting up dev mode.'); }
+    });
+    const mount = () => document.body.appendChild(m);
+    document.body ? mount() : document.addEventListener('DOMContentLoaded', mount);
+  }
+  function devChip() {
+    if (!isDev()) return;
+    const right = document.querySelector('.pill-right'); if (!right || right.querySelector('.dev-chip')) return;
+    const b = document.createElement('button'); b.className = 'dev-chip'; b.type = 'button'; b.title = 'Dev key';
+    b.innerHTML = '<span class="mono" data-chipbal>dev</span>';
+    b.onclick = () => devPanel();
+    right.insertBefore(b, right.firstChild);
+    devBalance().then(v => { const el = b.querySelector('[data-chipbal]'); if (el) el.textContent = v === null ? 'dev' : 'dev ' + (Number(v)/1e18).toFixed(3); });
+  }
+
   async function sendTx(tx, expectedTo) {
     if (!tx || tx.chainId !== CHAIN.id || !/^0x[0-9a-fA-F]{40}$/.test(tx.to) || (expectedTo && tx.to.toLowerCase() !== expectedTo.toLowerCase()) || !/^0x[0-9a-fA-F]*$/.test(tx.data) || !/^0x[0-9a-fA-F]+$/.test(tx.value)) throw Error('The transaction did not match the expected contract.');
+    if (devOn()) return devSend(tx);
     await ensureChain();
     const bal = BigInt(await state.provider.request({ method:'eth_getBalance', params:[state.address,'latest'] }));
     if (bal <= BigInt(tx.value)) throw Error('Your wallet needs enough ETH for the transaction plus gas.');
@@ -140,6 +255,7 @@ window.AXON = (() => {
     if (!nav.dataset.scrollBound) { nav.dataset.scrollBound = '1'; addEventListener('scroll', stuck, { passive: true }); }
     stuck();
     const tg = $('#theme-tg'); if (tg) tg.addEventListener('click', () => setTheme(!isDev()));
+    devChip();
     const tgm = $('#theme-tg-m'); if (tgm) tgm.addEventListener('click', () => setTheme(!isDev()));
     // sliding indicator under the active tab; follows hover and returns to the active page
     const links = $('.nav-links', nav); if (links && !isDev()) {
@@ -326,6 +442,6 @@ window.AXON = (() => {
     return `<tr class="official-row">${cells.join('')}</tr>`;
   }
 
-  document.addEventListener('DOMContentLoaded', () => { renderNav(); autoReconnect(); fancySelects(); new MutationObserver(()=>fancySelects()).observe(document.body,{childList:true,subtree:true}); });
-  return { BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, fancySelects, openWalletModal, ensureChain, sendTx, login, me, renderNav, official, officialCard, officialRow, setTheme, isDev };
+  document.addEventListener('DOMContentLoaded', () => { devGate(); renderNav(); autoReconnect(); fancySelects(); new MutationObserver(()=>fancySelects()).observe(document.body,{childList:true,subtree:true}); });
+  return { devPanel, devBalance, devOn, BRAND, CHAIN, base, href, $, esc, api, fmtUsd, fmtEth, fromWei, toWei, ago, short, pct, toast, state, fancySelects, openWalletModal, ensureChain, sendTx, login, me, renderNav, official, officialCard, officialRow, setTheme, isDev };
 })();

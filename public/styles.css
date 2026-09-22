@@ -519,3 +519,18 @@ html[data-theme=dev] html,html[data-theme=dev] body{scroll-behavior:auto}
 html[data-theme=dev] .card.hover:hover,html[data-theme=dev] .btn:hover{transform:none;filter:none!important}
 html[data-theme=dev] .pop.in,html[data-theme=dev] .pop{transform:none;opacity:1}
 html[data-theme=dev]{scroll-behavior:auto}
+
+.dev-gate .gate-card{max-width:520px}
+.dev-warnbox{margin:14px 0 4px;padding:14px 16px;border-radius:14px;background:var(--wash);border:1px solid var(--line)}
+.dev-warnbox b{display:block;margin-bottom:8px;font-size:14px}
+.dev-warnbox ul{margin:0;padding-left:18px}
+.dev-warnbox li{margin:0 0 6px;font-size:14px;line-height:1.5;color:var(--ink-80)}
+.dev-card{max-width:440px}
+.dev-note{margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--ink-80)}
+.dev-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:14px}
+.dev-row span{color:var(--muted)}
+.dev-fund{display:flex;gap:8px;margin:14px 0 4px}
+.dev-fund .inp{flex:1;min-width:0}
+.dev-warn{margin:14px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+.dev-chip{display:grid;place-items:center;height:32px;padding:0 12px;border:1px solid var(--line);border-radius:2px;background:transparent;color:var(--ink);font-family:var(--mono);font-size:13px;cursor:pointer}
+.dev-chip:hover{background:var(--wash)}
