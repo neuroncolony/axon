@@ -118,8 +118,8 @@ def model_from_tx(txhash):
         t = rpc('eth_getTransactionByHash', [txhash])
         m = MODEL_TAG.search(bytes.fromhex((t or {}).get('input', '0x')[2:]))
         return m.group(1).decode() if m else None
-    except Exception:
-        return None
+    except Exception as e:
+        print('model_from_tx', txhash[:12], repr(e), flush=True); return None
 
 def curve_state(curve):
     """Reads from the bonding curve. Each call is isolated so one missing getter does not kill the row.

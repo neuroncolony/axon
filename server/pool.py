@@ -70,11 +70,11 @@ def _purge_foreign():
     return gone
 
 def _recover_models():
-    """Fill missing model ids from the launch calldata. Idempotent; each record is tried once per process."""
+    """Fill missing model ids from the launch calldata. Retried every refresh until it resolves (three cheap RPC reads at most)."""
     changed = 0
     for rec in TOKENS.values():
-        if rec.get('model') or not rec.get('tx') or rec.get('_modelTried'): continue
-        rec['_modelTried'] = True
+        if rec.get('model') or not rec.get('tx'): continue
+        rec.pop('_modelTried', None)
         m = chain.model_from_tx(rec['tx'])
         if m in M.BY_ID: rec['model'] = m; changed += 1
     if changed: store.save('tokens')
