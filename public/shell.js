@@ -41,12 +41,24 @@ window.AXON = (() => {
   const pct = x => x == null ? '...' : (x*100).toFixed(x*100 < 10 ? 1 : 0) + '%';
   function toast(m, ms=3200) { const t = document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(), ms); }
 
-  // ---------- entry gate (terms + cookies). Must be accepted before using the site.
+  // ---------- cookie notice (bottom right, non-blocking, separate from the terms gate)
+  function cookieBar() {
+    const CK = 'axon_cookies';
+    if (localStorage.getItem(CK) || document.cookie.split(';').some(c => /^axon_cookies=/.test(c.trim()))) return;
+    const set = v => { document.cookie = CK + '=' + v + '; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); localStorage.setItem(CK, v); };
+    const el = document.createElement('div'); el.className = 'cookie-pop';
+    el.innerHTML = `<div class="cookie-t">Cookies</div><p>We use one first-party cookie to remember your choices. No trackers, no third-party analytics.</p><div class="cookie-actions"><button class="btn ghost" data-no>Decline</button><button class="btn accent" data-ok>Accept</button></div>`;
+    el.addEventListener('click', e => { if (e.target.closest('[data-ok]')) set('1'); else if (e.target.closest('[data-no]')) set('0'); else return; el.classList.add('bye'); setTimeout(() => el.remove(), 300); });
+    const mount = () => document.body.appendChild(el);
+    document.body ? mount() : document.addEventListener('DOMContentLoaded', mount);
+  }
+
+  // ---------- entry gate (terms). Must be accepted before using the site.
   (function gate() {
     const KEY = 'axon_consent', EXIT = 'https://www.ponsfamily.com';
     const has = () => document.cookie.split(';').some(c => c.trim().startsWith(KEY + '=1')) || localStorage.getItem(KEY) === '1';
-    if (has()) return;
-    const accept = () => { document.cookie = KEY + '=1; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); localStorage.setItem(KEY, '1'); m.classList.add('out'); document.documentElement.classList.remove('gated'); setTimeout(() => m.remove(), 320); };
+    if (has()) { const mount = () => cookieBar(); document.body ? mount() : document.addEventListener('DOMContentLoaded', mount); return; }
+    const accept = () => { document.cookie = KEY + '=1; max-age=31536000; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : ''); localStorage.setItem(KEY, '1'); m.classList.add('out'); document.documentElement.classList.remove('gated'); setTimeout(() => m.remove(), 320); cookieBar(); };
     const leave = () => { location.replace(EXIT); };
     const m = document.createElement('div'); m.className = 'modal gate'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
     m.innerHTML = `<div class="card modal-card gate-card">
@@ -54,7 +66,6 @@ window.AXON = (() => {
       <h2 class="modal-title">Before you enter</h2>
       <p>axon is a token launcher on Robinhood Chain. Tokens launched here are experimental, unaudited by any third party, and can go to zero. Nothing on this site is financial advice. Trades are on-chain and cannot be reversed.</p>
       <p>By entering you confirm you are of legal age where you live, you are not in a restricted jurisdiction, and you accept the <a href="/docs#limits">honest limits</a> of this product.</p>
-      <p class="gate-cookie">We set one first-party cookie (<code>axon_consent</code>) to remember this choice for a year. No trackers, no third-party analytics.</p>
       <div class="gate-actions"><button class="btn ghost" data-leave>I do not accept</button><button class="btn accent" data-accept>Accept and enter</button></div>
     </div>`;
     m.addEventListener('click', e => { if (e.target.closest('[data-accept]')) accept(); else if (e.target.closest('[data-leave]')) leave(); });
