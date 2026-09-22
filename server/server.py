@@ -117,6 +117,9 @@ class H(BaseHTTPRequestHandler):
         if p == 'trades': return self.send(200, {'trades': pool.on_chain_trades(token=q.get('token'), limit=min(int(q.get('limit', 100)), 500))})
         if p == 'candles': return self.send(200, pool.candles(q.get('token', ''), interval_s=max(60, int(q.get('interval', 300))), limit=min(int(q.get('limit', 200)), 500)))
         if p.startswith('token/') and p.endswith('/logo'):
+            # the official token wears the axon mark itself, shipped with the site, no outside host involved
+            if p[6:-5].lower() == (official.official()['token'] or '') and (PUBLIC / 'official-logo.png').is_file():
+                return self.send(200, body=(PUBLIC / 'official-logo.png').read_bytes(), ctype='image/png', headers={'Cache-Control': 'public, max-age=86400'})
             rec = pool.TOKENS.get(p[6:-5].lower())
             if rec and rec.get('logo'):
                 # served from our own origin: a third party host being slow or down never blanks a card
