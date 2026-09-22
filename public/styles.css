@@ -419,7 +419,7 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
   .nav-mobile a{color:var(--ink)}
   .hero{display:flex;flex-direction:column;align-items:stretch}
   .hero-bg{order:0}.hero-in{order:1}
-  .hero-caps{order:2;position:static;inset:auto;display:flex;flex-wrap:wrap;justify-content:center;gap:8px 10px;margin:28px 14px 0;pointer-events:auto}
+  .hero-caps{display:none}
   .hero-caps .cap{position:static;top:auto;bottom:auto;left:auto;right:auto;rotate:0deg;animation:none;filter:none!important;opacity:1!important;height:38px;font-size:12px;padding:0 14px 0 6px;gap:7px}
   .hero-caps .cap-2,.hero-caps .cap-4,.hero-caps .cap-6,.hero-caps .cap-8{display:none}
 }
