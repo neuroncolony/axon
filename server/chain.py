@@ -166,6 +166,14 @@ def launch_logs(from_block, to_block='latest'):
                     'block':int(l['blockNumber'],16),'tx':l['transactionHash']})
     return out
 
+def launch_log_of(token):
+    """Exact launch block and tx for one token: a single topic-filtered getLogs, no range scan."""
+    t = '0x' + '0' * 24 + addr(token)[2:]
+    logs = rpc('eth_getLogs', [{'fromBlock': '0x0', 'toBlock': 'latest', 'address': PONS, 'topics': [LAUNCH_TOPIC, t]}])
+    if not logs: return None
+    l = logs[0]
+    return {'block': int(l['blockNumber'], 16), 'tx': l['transactionHash']}
+
 def receipt(txhash):
     if not re.fullmatch(r'0x[0-9a-fA-F]{64}', txhash or ''): raise ValueError('Bad tx hash.')
     return rpc('eth_getTransactionReceipt',[txhash])

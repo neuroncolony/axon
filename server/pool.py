@@ -91,16 +91,33 @@ def _recover_models():
 try: _recover_models()
 except Exception as e: print('recover at boot', repr(e), flush=True)
 
-def _index_trades(head):
-    """Pull Buy/Sell events for every adopted token since its lastTradeBlock. Chunks of 5000 blocks, deduped by tx+logIndex."""
+def _launch_block(rec):
+    """Block the token launched in. Resolved once, then cached on the record."""
+    b = rec.get('block')
+    if b: return int(b)
+    try:
+        lg = chain.launch_log_of(rec['token'])
+    except Exception: lg = None
+    if not lg: return None
+    rec['block'] = lg['block']; rec.setdefault('tx', lg['tx']); store.save('tokens')
+    return lg['block']
+
+def _index_trades(head, budget=40.0):
+    """Pull Buy/Sell events for every adopted token since its lastTradeBlock. Chunks of 5000 blocks,
+    deduped by tx+logIndex. Progress is saved per chunk and the pass is time-boxed, so a slow or
+    partial sweep still moves forward instead of restarting from zero every time."""
+    deadline = time.time() + budget
     for key, rec in list(TOKENS.items()):
-        start = int(rec.get('lastTradeBlock') or rec.get('block') or FIRST_AXON_BLOCK) + 1
+        lb = rec.get('lastTradeBlock') or _launch_block(rec)
+        if lb is None: continue          # unknown launch block: never scan from genesis
+        start = int(lb) + 1
         if start > head: continue
         rows = TRADES.setdefault(key, [])
         seen = {(r['tx'], r.get('logIndex')) for r in rows}
         try:
             for a in range(start, head + 1, 5000):
-                for t in chain.trade_logs(rec['curve'], a, hex(min(a + 4999, head))):
+                end = min(a + 4999, head)
+                for t in chain.trade_logs(rec['curve'], a, hex(end)):
                     if (t['tx'], t['logIndex']) in seen: continue
                     t['token'] = rec['token']; t['at'] = chain.block_timestamp(t['block'])
                     eth_w, tok_w = int(t['ethWei']), int(t['tokenWei'])
@@ -108,36 +125,57 @@ def _index_trades(head):
                     rows.append(t); seen.add((t['tx'], t['logIndex'])); store.append('trades', t)
                     store.append('events', {'type': t['side'], 'token': rec['token'], 'symbol': rec.get('symbol'), 'model': rec.get('model'),
                                             'by': t['trader'], 'ethWei': t['ethWei'], 'tokenWei': t['tokenWei'], 'tx': t['tx'], 'at': t['at']})
-            rec['lastTradeBlock'] = head
+                rec['lastTradeBlock'] = end          # keep the ground already covered
+                if time.time() > deadline: break
         except Exception as e: print('trade index', rec.get('symbol'), repr(e), flush=True)
         if rec.get('logo') in ('', None) and not rec.get('logoChecked') and rec.get('tx'):
             try: rec['logo'] = chain.launch_logo(rec['tx']); rec['logoChecked'] = True
             except Exception: pass
+        if time.time() > deadline: break
+    store.save('tokens')
 
 FIRST_AXON_BLOCK = 67690000  # nothing paid our treasury before this block; skip the older pons history
-_ix = {'lastBlock': None, 'at': 0, 'lock': threading.Lock()}
+_ix = store.load('ixstate', {'lastBlock': None, 'notOurs': []})
+_ix.setdefault('lastBlock', None); _ix.setdefault('notOurs', [])
+_ix['at'] = 0; _ix['lock'] = threading.Lock()
+_NOT_OURS = set(_ix['notOurs'])
+
+def _save_ix():
+    _ix['notOurs'] = list(_NOT_OURS)[-6000:]
+    store.save('ixstate')
+
 def refresh(force=False):
-    """Sweep recent TokenLaunched logs, adopt tokens whose creatorFeeRecipient is our treasury, re-read curve state for known tokens."""
+    """Sweep TokenLaunched logs forward from a persisted cursor and adopt every launch whose creator
+    fee routes to our treasury. Foreign launches are rejected with ONE cheap call and remembered, so a
+    busy chain cannot stall the sweep before it reaches the newest blocks."""
     with _ix['lock']:
         if not force and time.time() - _ix['at'] < 45: return {'skipped': True}
         st = chain.status()
         if not st.get('ok'): return {'error': st.get('error')}
-        head = st['block']; start = _ix['lastBlock'] or max(head - 400000, FIRST_AXON_BLOCK); adopted = 0
+        head = st['block']; tre = (chain.treasury() or '').lower()
+        start = _ix['lastBlock'] or max(head - 400000, FIRST_AXON_BLOCK); adopted = 0
+        deadline = time.time() + 45
         for a in range(start, head + 1, 9000):
-            try: logs = chain.launch_logs(a, hex(min(a + 8999, head)))
+            end = min(a + 8999, head)
+            try: logs = chain.launch_logs(a, hex(end))
             except Exception: logs = []
             for l in logs:
-                if l['token'].lower() in TOKENS: continue
-                if hidden.is_hidden(l['token']): continue
+                k = l['token'].lower()
+                if k in TOKENS or k in _NOT_OURS or hidden.is_hidden(l['token']): continue
                 try:
+                    # one eth_call decides it; only a real axon launch earns the full snapshot
+                    if chain.launched(l['token'])['creatorFeeRecipient'].lower() != tre:
+                        _NOT_OURS.add(k); continue
                     snap = chain.token_snapshot(l['token'])
-                    if not snap['fundedByAxon']: continue
+                    if not snap['fundedByAxon']: _NOT_OURS.add(k); continue
                     if adopted < 200:
                         rec = _record(snap, None, '', '', l['tx'], l['block']); rec['native'] = True; rec['creatorFeeRecipient'] = snap['creatorFeeRecipient']; TOKENS[rec['token'].lower()] = rec; adopted += 1
                         if not _has_launch_event(rec['token']):
                             store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
                 except Exception: pass
-        _ix['lastBlock'] = head; _ix['at'] = time.time()
+            _ix['lastBlock'] = end                     # cursor survives restarts and slow passes
+            if time.time() > deadline: break
+        _save_ix(); _ix['at'] = time.time()
         _purge_foreign()
         _recover_models()
         _index_trades(head)
