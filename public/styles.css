@@ -31,6 +31,7 @@ h1,h2,h3,h4{margin:0;font-family:var(--head);font-weight:600;color:var(--ink);le
 h1{font-size:clamp(40px,5.2vw,64px);line-height:1.05}h2{font-size:clamp(28px,3.2vw,40px);line-height:1.1}h3{font-size:20px;line-height:1.25}
 h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .mono,.kbd,.copy{font-family:var(--mono);font-size:.92em}
+@media (max-width:480px){.mono{overflow-wrap:anywhere;word-break:break-all}}
 .wrap{width:100%;max-width:var(--shell);margin:0 auto;padding:0 20px}
 .faint{color:var(--faint)}.muted{color:var(--muted)}.num{text-align:right;font-variant-numeric:tabular-nums}
 /* header: two floating glass pills */
