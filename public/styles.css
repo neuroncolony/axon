@@ -412,3 +412,4 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
   .field input,.field select{min-width:0;font-size:16px}
 }
 .keys-split{grid-template-columns:1fr 22rem}@media(max-width:640px){.keys-split{grid-template-columns:1fr!important}}
+@media(max-width:640px){.docs .prose{margin:0;width:100%;max-width:100%}.docs{gap:1rem}}
