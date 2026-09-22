@@ -305,6 +305,30 @@ def spent_usd(): return round(max(0.0, LEDGER['spentUsd'] - SPENT_BASELINE_USD),
 MESSAGES_BASELINE = int(os.environ.get('AXON_MESSAGES_BASELINE', '0') or 0)
 def messages_count(): return max(0, LEDGER['messages'] - MESSAGES_BASELINE)
 def model_usage(): return {m: round(v, 6) for m, v in LEDGER['byModel'].items()}
+def leaderboard(by='mcap'):
+    toks = token_list(sort=by if by in ('mcap', 'volume', 'graduation') else 'mcap', limit=100); launchers = {}
+    for r in toks:
+        d = launchers.setdefault(r['deployer'], {'address': r['deployer'], 'launches': 0, 'marketCapUsd': 0.0, 'spentUsd': LEDGER['byAddress'].get(r['deployer'].lower(), 0.0)})
+        d['launches'] += 1; d['marketCapUsd'] += r.get('marketCapUsd') or 0
+    return {'tokens': toks[:25], 'launchers': sorted(launchers.values(), key=lambda d: -d['marketCapUsd'])[:25], 'models': model_usage()}
+def scoreboard():
+    bets = store.read_jsonl('bets', 1000); by = {}
+    for b in bets:
+        if hidden.is_hidden(b.get('token')): continue
+        s = by.setdefault(b['token'], {'token': b['token'], 'symbol': b.get('symbol'), 'model': b.get('model'), 'bets': 0, 'hits': 0, 'misses': 0, 'pending': 0, 'last': None})
+        if b.get('result') is None: s['bets'] += 1; s['pending'] += 1; s['last'] = b
+        elif b.get('result') == 'hit': s['hits'] += 1; s['pending'] = max(0, s['pending'] - 1)
+        else: s['misses'] += 1; s['pending'] = max(0, s['pending'] - 1)
+    rows = list(by.values())
+    for r in rows: r['accuracy'] = (r['hits'] / (r['hits'] + r['misses'])) if (r['hits'] + r['misses']) else None
+    return {'rows': sorted(rows, key=lambda r: (-(r['accuracy'] or 0), -r['bets'])), 'recent': hidden.visible(bets[-40:][::-1])}
+def offspring():
+    """An offspring is a token launched by a wallet that had already launched an axon token. Lineage is derived from chain order, not declared."""
+    first = {}
+    for r in sorted(_ours(), key=lambda r: r.get('block') or 0): first.setdefault(r['deployer'].lower(), r)
+    px = eth_usd(); ts = _trade_stats()
+    out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in _ours() if first[r['deployer'].lower()]['token'] != r['token']]
+    return sorted(out, key=lambda o: -o['child'].get('launchedAt', 0))
 POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
 def fee_inflow_eth():
     """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
