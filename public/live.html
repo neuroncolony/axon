@@ -24,6 +24,7 @@
         <p style="margin:.5rem 0 0" id="claimable-line">Claimable now: …</p>
         <p class="hint" style="margin:.5rem 0 0">Every launch on this site pays a 2% creator tax to this wallet on top of the 1% pons base fee. Launchers keep nothing. Tax accrues on each curve, is swept to the pons escrow, and the treasury wallet claims it here.</p>
         <button class="btn" id="claim-btn" style="margin-top:.75rem">Claim to treasury</button>
+        <div id="owner-box" class="hint" style="margin:.9rem 0 0;padding-top:.75rem;border-top:1px solid var(--line, rgba(11,26,51,.08))"></div>
       </div>
       <div class="card" style="margin-top:1rem">
         <div class="eyebrow">How fees flow</div>
@@ -116,6 +117,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addr = (AXON.state.address || '').toLowerCase();
     const owner = !!treasury && addr === treasury;
     treasuryCard.style.display = owner ? '' : 'none';
+    if (owner) fillOwner();
   }
   function checkWallet() { syncCardVisibility(); }
   claimBtn.addEventListener('click', async () => {
@@ -131,6 +133,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) { AXON.toast(e.message); claimBtn.disabled = false; }
   });
   document.addEventListener('axon:wallet', checkWallet);
+  async function fillOwner() {
+    const box = document.getElementById('owner-box'); if (!box) return;
+    try {
+      const o = await api('owner');
+      const eth = v => v == null ? 'unknown' : Number(v).toFixed(5) + ' ETH';
+      const usd = v => v == null ? '' : ' (~$' + Number(v).toFixed(2) + ')';
+      box.innerHTML = `<div class="eyebrow">Private accounting</div>
+        <dl class="kv" style="margin-top:.5rem"><dt>Wallet balance</dt><dd>${eth(o.walletEth)}</dd><dt>Fees earned to date</dt><dd>${eth(o.feeInflowEth)}</dd>
+        <dt>Yours to move</dt><dd><strong>${eth(o.ownerShareEth)}</strong>${usd(o.ownerShareUsd)}</dd>
+        <dt>Compute reserve</dt><dd>${eth(o.reserveEth)}${usd(o.reserveUsd)}</dd><dt>Reserve spent</dt><dd>$${Number(o.spentUsd || 0).toFixed(2)}</dd><dt>Reserve left</dt><dd>${o.reserveLeftUsd == null ? 'unknown' : '$' + Number(o.reserveLeftUsd).toFixed(2)}</dd>
+        ${o.releasedEth ? `<dt>Released from reserve</dt><dd>${eth(o.releasedEth)}</dd>` : ''}</dl>
+        <p style="margin:.6rem 0 0">Claimed fees land in this wallet. "Yours to move" is what you can send out without starving the agents; the reserve stays here and is spent per message at list price. Only this wallet sees this box.</p>`;
+    } catch (e) { box.innerHTML = ''; }
+  }
   api('status').then(fillTreasury).catch(() => { claimableLine.textContent = 'Claimable now: unknown'; claimBtn.disabled = true; claimBtn.textContent = 'Nothing to claim yet'; });
 });
 </script></body></html>

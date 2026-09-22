@@ -298,43 +298,35 @@ def takes(limit=60, token=None):
     rows = hidden.visible(rows)
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 
+POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
+def fee_inflow_eth():
+    """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
+    wei = 0
+    for r in _ours():
+        for t in TRADES.get(r['token'].lower(), []):
+            try: wei += int(t.get('creatorFeeWei') or 0)
+            except (TypeError, ValueError): pass
+    return wei / 1e18
+def _split():
+    inflow = fee_inflow_eth()
+    reserve = max(0.0, inflow * POOL_SHARE - POOL_RELEASE_ETH)
+    owner = inflow - reserve
+    return inflow, reserve, owner
 def stats():
     px = eth_usd(); tb = chain.treasury_balance()
-    avail = (int(tb['balanceWei']) / 1e18 * px * POOL_SHARE) if (tb['balanceWei'] and px) else None
+    inflow, reserve, owner = _split()
+    avail = (reserve * px) if px else None
     spent = LEDGER['spentUsd']
     return {'treasury': tb['treasury'], 'treasuryEth': chain.eth(int(tb['balanceWei'])) if tb['balanceWei'] else None, 'ethUsd': px, 'availableUsd': avail,
             'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
-def model_usage():
-    counts = {}
-    for r in _ours():
-        if r.get('model'): counts[r['model']] = counts.get(r['model'], 0) + 1
-    return {'launches': counts, 'spentUsd': LEDGER['byModel']}
-def leaderboard(by='mcap'):
-    toks = token_list(sort=by if by in ('mcap', 'volume', 'graduation') else 'mcap', limit=100); launchers = {}
-    for r in toks:
-        d = launchers.setdefault(r['deployer'], {'address': r['deployer'], 'launches': 0, 'marketCapUsd': 0.0, 'spentUsd': LEDGER['byAddress'].get(r['deployer'].lower(), 0.0)})
-        d['launches'] += 1; d['marketCapUsd'] += r.get('marketCapUsd') or 0
-    return {'tokens': toks[:25], 'launchers': sorted(launchers.values(), key=lambda d: -d['marketCapUsd'])[:25], 'models': model_usage()}
-def scoreboard():
-    bets = store.read_jsonl('bets', 1000); by = {}
-    for b in bets:
-        if hidden.is_hidden(b['token']): continue
-        s = by.setdefault(b['token'], {'token': b['token'], 'symbol': b.get('symbol'), 'model': b.get('model'), 'bets': 0, 'hits': 0, 'misses': 0, 'pending': 0, 'last': None})
-        if b.get('result') is None: s['bets'] += 1; s['pending'] += 1; s['last'] = b
-        elif b.get('result') == 'hit': s['hits'] += 1; s['pending'] = max(0, s['pending'] - 1)
-        else: s['misses'] += 1; s['pending'] = max(0, s['pending'] - 1)
-    rows = list(by.values())
-    for r in rows: r['accuracy'] = (r['hits'] / (r['hits'] + r['misses'])) if (r['hits'] + r['misses']) else None
-    return {'rows': sorted(rows, key=lambda r: (-(r['accuracy'] or 0), -r['bets'])), 'recent': hidden.visible(bets[-40:][::-1])}
-def offspring():
-    """An offspring is a token launched by a wallet that had already launched an axon token. Lineage is derived from chain order, not declared."""
-    first = {}
-    for r in sorted(_ours(), key=lambda r: r.get('block') or 0): first.setdefault(r['deployer'].lower(), r)
-    px = eth_usd(); ts = _trade_stats()
-    out = [{'child': enrich(r, px, ts), 'parent': enrich(first[r['deployer'].lower()], px, ts)} for r in _ours() if first[r['deployer'].lower()]['token'] != r['token']]
-    return sorted(out, key=lambda o: -o['child'].get('launchedAt', 0))
-
-# ------------------------------------------------------------------ entitlement + chat
+def owner_view():
+    """Private accounting for the treasury wallet only. Never served without a signed session matching the treasury."""
+    px = eth_usd() or 0; tb = chain.treasury_balance(); inflow, reserve, owner = _split()
+    spent_eth = (LEDGER['spentUsd'] / px) if px else None
+    bal = int(tb['balanceWei']) / 1e18 if tb['balanceWei'] else None
+    return {'treasury': tb['treasury'], 'walletEth': bal, 'feeInflowEth': inflow, 'ownerShareEth': owner, 'ownerShareUsd': owner * px if px else None,
+            'reserveEth': reserve, 'reserveUsd': reserve * px if px else None, 'spentUsd': LEDGER['spentUsd'], 'spentEth': spent_eth,
+            'reserveLeftUsd': (reserve * px - LEDGER['spentUsd']) if px else None, 'releasedEth': POOL_RELEASE_ETH, 'ethUsd': px}
 def entitlement(address):
     a = address.lower(); owned = [r for r in _ours() if r['deployer'].lower() == a]
     return {'hasLaunched': bool(owned), 'launches': [{'token': r['token'], 'symbol': r.get('symbol'), 'model': r.get('model')} for r in owned],

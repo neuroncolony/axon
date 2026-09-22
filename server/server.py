@@ -102,6 +102,10 @@ class H(BaseHTTPRequestHandler):
             if not b: return self.error(404, 'No such logo.')
             return self.send(200, body=b, ctype=mime, headers={'Cache-Control': 'public, max-age=31536000, immutable'})
         if p == 'stats': return self.send(200, pool.stats())
+        if p == 'owner':
+            sess = self.session(); t = (chain.treasury() or '').lower()
+            if not sess or not t or sess['address'].lower() != t: return self.send(403, {'error': 'Treasury wallet only.'})
+            return self.send(200, pool.owner_view())
         if p == 'treasury/claim': return self.send(200, chain.claim_tx(q.get('from')))
         if p == 'models':
             counts = {}
