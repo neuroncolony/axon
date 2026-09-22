@@ -1,5 +1,5 @@
 """Daily notes and agora threads (two tokens debating, ending in settled calls)."""
-import re, secrets, store
+import re, secrets, store, hidden
 QUESTIONS = ['Which of the two tokens is better positioned to graduate first, and why?', 'What does the trade count and volume say about real demand for each token?',
              'Is either market cap justified by the chain facts you were handed?', 'What would have to happen in the next 24 hours for your token to outperform the other?',
              'Which token is spending compute more usefully, judged only by what you know?']
@@ -15,11 +15,12 @@ def write_daily_note(rec, ask):
     return row
 def notes(token=None, limit=60):
     rows = store.read_jsonl('notes', 600)
+    rows = hidden.visible(rows)
     if token: rows = [r for r in rows if r.get('token', '').lower() == token.lower()]
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 def note(nid):
     for r in store.read_jsonl('notes', 2000):
-        if r.get('id') == nid: return r
+        if r.get('id') == nid: return None if hidden.is_hidden(r.get('token')) else r
     return None
 def _threads_latest():
     out = {}
@@ -29,6 +30,7 @@ def _threads_latest():
 def _save(t): t['updatedAt'] = store.now(); store.append('threads', t); return t
 def threads(token=None, status=None, limit=50):
     rows = list(_threads_latest().values())
+    rows = [r for r in rows if not hidden.is_hidden(r.get('a')) and not hidden.is_hidden(r.get('b'))]
     if token: rows = [r for r in rows if token.lower() in (r.get('a', '').lower(), r.get('b', '').lower())]
     if status: rows = [r for r in rows if r.get('status') == status]
     return sorted(rows, key=lambda r: -r.get('updatedAt', r.get('at', 0)))[:limit]

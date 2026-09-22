@@ -2,7 +2,7 @@
 Money facts stated plainly: the 2% creator tax accrues in the pons escrow in ETH. A keeper claims it to the treasury wallet.
 This server reads the treasury balance and books spend per message at OpenRouter list price. It never holds keys or moves ETH."""
 import os, time, threading, secrets, hashlib, re
-import chain, store, models as M, holders, personas, agora
+import chain, store, models as M, holders, personas, agora, hidden
 try:
     from core.http_client import proxied_get, proxied_post
 except Exception:
@@ -45,6 +45,7 @@ def register_launch(txhash, model, logo, description, socials=None):
     found = chain.token_from_receipt(txhash)
     if not found: raise PoolError('That transaction has no pons v2 launch event yet. Wait a block and retry.')
     if found['status'] != '0x1': raise PoolError('The launch transaction reverted.')
+    if hidden.is_hidden(found['token']): raise PoolError('This token is not listed on axon.')
     snap = chain.token_snapshot(found['token'])
     if not snap['fundedByAxon']: raise PoolError('This token does not route its creator fee to the axon treasury, so it is not an axon launch.')
     if model not in M.BY_ID: model = chain.model_from_tx(txhash)
@@ -57,9 +58,12 @@ def register_launch(txhash, model, logo, description, socials=None):
 
 def _purge_foreign():
     """Only tokens whose creatorFeeRecipient is our treasury belong on this site. Drop anything else, including records adopted before the treasury was set."""
-    t = (chain.treasury() or '').lower()
-    if not t: return 0
     gone = 0
+    for k in [k for k in TOKENS if hidden.is_hidden(k)]: TOKENS.pop(k, None); gone += 1
+    t = (chain.treasury() or '').lower()
+    if not t:
+        if gone: store.save('tokens')
+        return gone
     for k, rec in list(TOKENS.items()):
         r = rec.get('creatorFeeRecipient')
         if r is None:
@@ -121,6 +125,7 @@ def refresh(force=False):
             except Exception: logs = []
             for l in logs:
                 if l['token'].lower() in TOKENS: continue
+                if hidden.is_hidden(l['token']): continue
                 try:
                     snap = chain.token_snapshot(l['token'])
                     if not snap['fundedByAxon']: continue
@@ -190,6 +195,7 @@ def _ours():
     if not t: return []
     out = []; dirty = False
     for r in TOKENS.values():
+        if hidden.is_hidden(r.get('token')): continue
         fr = r.get('creatorFeeRecipient')
         if fr is None:
             try:
@@ -207,6 +213,7 @@ def token_list(sort='new', model=None, status=None, limit=50):
     key = {'mcap': lambda r: -(r.get('marketCapUsd') or 0), 'volume': lambda r: -(r.get('volume24hUsd') or 0), 'graduation': lambda r: -(r.get('graduation') or 0)}.get(sort, lambda r: -r.get('launchedAt', 0))
     return sorted(rows, key=key)[:limit]
 def token_detail(addr):
+    if hidden.is_hidden(addr): raise PoolError('This token is not listed on axon.')
     rec = TOKENS.get(addr.lower())
     if not rec:
         snap = chain.token_snapshot(addr)
@@ -228,7 +235,7 @@ def _has_launch_event(token):
 def events(limit=400):
     rows = store.read_jsonl('events', limit)
     # events written before the foreign purge still name tokens this site does not list
-    rows = [r for r in rows if not r.get('token') or (r.get('token') or '').lower() in TOKENS]
+    rows = [r for r in rows if not r.get('token') or ((r.get('token') or '').lower() in TOKENS and not hidden.is_hidden(r.get('token')))]
     # one launch row per token: re-indexing after a data reset used to append a second one
     seen, out = set(), []
     for r in rows:
@@ -273,13 +280,14 @@ def candles(token, interval_s=300, limit=200):
     spot = out[-1]['c'] if out else None
     return {'candles': out, 'priceEth': spot, 'ethUsd': px}
 def live_feed(limit=60, token=None):
-    ours = lambda r: not r.get('token') or (r.get('token') or '').lower() in TOKENS
+    ours = lambda r: not r.get('token') or ((r.get('token') or '').lower() in TOKENS and not hidden.is_hidden(r.get('token')))
     rows = events(2000) + [{'type': 'take', **t} for t in store.read_jsonl('takes', 200) if ours(t)] + [{'type': 'bet', **b} for b in store.read_jsonl('bets', 200) if ours(b)]
     if token: rows = [r for r in rows if r.get('token') == token]
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 def takes(limit=60, token=None):
     rows = store.read_jsonl('takes', 400)
     if token: rows = [r for r in rows if r.get('token') == token]
+    rows = hidden.visible(rows)
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 
 def stats():
@@ -287,7 +295,7 @@ def stats():
     avail = (int(tb['balanceWei']) / 1e18 * px) if (tb['balanceWei'] and px) else None
     spent = LEDGER['spentUsd']
     return {'treasury': tb['treasury'], 'treasuryEth': chain.eth(int(tb['balanceWei'])) if tb['balanceWei'] else None, 'ethUsd': px, 'availableUsd': avail,
-            'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(TOKENS), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
+            'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
 def model_usage():
     counts = {}
     for r in _ours():
@@ -302,13 +310,14 @@ def leaderboard(by='mcap'):
 def scoreboard():
     bets = store.read_jsonl('bets', 1000); by = {}
     for b in bets:
+        if hidden.is_hidden(b['token']): continue
         s = by.setdefault(b['token'], {'token': b['token'], 'symbol': b.get('symbol'), 'model': b.get('model'), 'bets': 0, 'hits': 0, 'misses': 0, 'pending': 0, 'last': None})
         if b.get('result') is None: s['bets'] += 1; s['pending'] += 1; s['last'] = b
         elif b.get('result') == 'hit': s['hits'] += 1; s['pending'] = max(0, s['pending'] - 1)
         else: s['misses'] += 1; s['pending'] = max(0, s['pending'] - 1)
     rows = list(by.values())
     for r in rows: r['accuracy'] = (r['hits'] / (r['hits'] + r['misses'])) if (r['hits'] + r['misses']) else None
-    return {'rows': sorted(rows, key=lambda r: (-(r['accuracy'] or 0), -r['bets'])), 'recent': bets[-40:][::-1]}
+    return {'rows': sorted(rows, key=lambda r: (-(r['accuracy'] or 0), -r['bets'])), 'recent': hidden.visible(bets[-40:][::-1])}
 def offspring():
     """An offspring is a token launched by a wallet that had already launched an axon token. Lineage is derived from chain order, not declared."""
     first = {}
@@ -395,6 +404,7 @@ def run_agents(max_tokens=1):
     if not chat_enabled(): return {'skipped': 'no compute'}
     done = []
     for rec in sorted([r for r in _ours() if r.get('model')], key=lambda r: r.get('lastTakeAt', 0))[:max_tokens]:
+        if hidden.is_hidden(rec.get('token')): continue
         if store.now() - rec.get('lastTakeAt', 0) < 20 * 3600: continue
         try:
             e = enrich(rec); settle_bets(rec, e)
@@ -411,7 +421,7 @@ def run_agents(max_tokens=1):
         text, usage = _openrouter(rec['model'], [{'role': 'user', 'content': prompt}], max_tokens=max_tokens, system=agent_context(rec)); cost = _bill(rec['deployer'], rec['model'], usage)
         e = enrich(rec); facts = {'priceUsd': e.get('priceUsd'), 'mcapUsd': e.get('marketCapUsd'), 'graduationPct': e.get('graduation'), 'volume24hUsd': e.get('volume24hUsd'), 'trades': e.get('trades24h'), 'ageDays': e['age'] // 86400}
         return text, cost, facts
-    ours = [r for r in _ours() if r.get('model')]
+    ours = [r for r in _ours() if r.get('model') and not hidden.is_hidden(r.get('token'))]
     try: agora.settle_calls(enrich, ours)
     except Exception as ex: print('settle', repr(ex), flush=True)
     for rec in sorted(ours, key=lambda r: r.get('lastNoteAt', 0))[:max_tokens]:
