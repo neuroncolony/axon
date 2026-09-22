@@ -304,6 +304,7 @@ SPENT_BASELINE_USD = float(os.environ.get('AXON_SPENT_BASELINE_USD', '0') or 0) 
 def spent_usd(): return round(max(0.0, LEDGER['spentUsd'] - SPENT_BASELINE_USD), 6)
 MESSAGES_BASELINE = int(os.environ.get('AXON_MESSAGES_BASELINE', '0') or 0)
 def messages_count(): return max(0, LEDGER['messages'] - MESSAGES_BASELINE)
+def model_usage(): return {m: round(v, 6) for m, v in LEDGER['byModel'].items()}
 POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
 def fee_inflow_eth():
     """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
