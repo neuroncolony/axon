@@ -83,7 +83,7 @@ def launch_fee(): return call(PONS, 'launchFee()')[0]
 
 def status():
     def fetch():
-        out = {'chainId':CHAIN_ID,'factory':PONS,'escrow':ESCROW,'treasury':treasury(),'ok':False,'launchFeeEth':None,'baseFeeBps':None,'creatorTaxBps':CREATOR_TAX_BPS,'block':None}
+        out = {'chainId':CHAIN_ID,'factory':PONS,'escrow':ESCROW,'treasury':treasury(),'ok':False,'launchFeeEth':None,'baseFeeBps':None,'creatorTaxBps':CREATOR_TAX_BPS,'block':None,'version':os.environ.get('RAILWAY_GIT_COMMIT_SHA','')[:7]}
         try:
             if int(rpc('eth_chainId',[]),16) != CHAIN_ID: raise ChainError('wrong chain')
             out['block'] = int(rpc('eth_blockNumber',[]),16)

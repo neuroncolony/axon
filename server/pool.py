@@ -80,6 +80,10 @@ def _recover_models():
     if changed: store.save('tokens')
     return changed
 
+
+try: _recover_models()
+except Exception as e: print('recover at boot', repr(e), flush=True)
+
 def _index_trades(head):
     """Pull Buy/Sell events for every adopted token since its lastTradeBlock. Chunks of 5000 blocks, deduped by tx+logIndex."""
     for key, rec in list(TOKENS.items()):
