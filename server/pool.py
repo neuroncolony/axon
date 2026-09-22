@@ -91,6 +91,24 @@ def _recover_models():
 try: _recover_models()
 except Exception as e: print('recover at boot', repr(e), flush=True)
 
+LOGO_CACHE = {}
+
+def logo_bytes(rec):
+    """Fetch and cache a token logo so the browser only ever talks to our origin."""
+    url = rec.get('logo') or ''
+    if not url.startswith('https://'): return None
+    hit = LOGO_CACHE.get(url)
+    if hit: return hit
+    try:
+        import urllib.request
+        with urllib.request.urlopen(url, timeout=6) as r:
+            body = r.read(400000); ct = r.headers.get('Content-Type', 'image/png')
+        if not ct.startswith('image/'): return None
+        LOGO_CACHE[url] = (body, ct)
+        if len(LOGO_CACHE) > 200: LOGO_CACHE.pop(next(iter(LOGO_CACHE)))
+        return LOGO_CACHE[url]
+    except Exception: return None
+
 def _launch_block(rec):
     """Block the token launched in. Resolved once, then cached on the record."""
     b = rec.get('block')
@@ -136,12 +154,13 @@ def _index_trades(head, budget=40.0):
 
 FIRST_AXON_BLOCK = 67690000  # nothing paid our treasury before this block; skip the older pons history
 _ix = store.load('ixstate', {'lastBlock': None, 'notOurs': []})
-_ix.setdefault('lastBlock', None); _ix.setdefault('notOurs', [])
+_ix.setdefault('lastBlock', None); _ix.setdefault('notOurs', []); _ix.setdefault('backfill', None)
 _ix['at'] = 0; _ix['lock'] = threading.Lock()
 _NOT_OURS = set(_ix['notOurs'])
 
 def _save_ix():
     _ix['notOurs'] = list(_NOT_OURS)[-6000:]
+    _ix.pop('lock', None) if False else None
     store.save('ixstate')
 
 def refresh(force=False):
@@ -153,10 +172,14 @@ def refresh(force=False):
         st = chain.status()
         if not st.get('ok'): return {'error': st.get('error')}
         head = st['block']; tre = (chain.treasury() or '').lower()
-        start = _ix['lastBlock'] or max(head - 400000, FIRST_AXON_BLOCK); adopted = 0
+        floor = max(head - 400000, FIRST_AXON_BLOCK); adopted = 0
         deadline = time.time() + 45
-        for a in range(start, head + 1, 9000):
-            end = min(a + 8999, head)
+        # newest blocks first: a launch made a minute ago is adopted on the very next sweep,
+        # and the older backfill keeps creeping down behind it instead of blocking it
+        spans = [(a, min(a + 8999, head)) for a in range(_ix['lastBlock'] or head - 9000, head + 1, 9000)]
+        back = _ix.get('backfill') or (_ix['lastBlock'] or head)
+        spans += [(max(b - 8999, floor), b) for b in range(back, floor, -9000)]
+        for a, end in spans:
             try: logs = chain.launch_logs(a, hex(end))
             except Exception: logs = []
             for l in logs:
@@ -173,7 +196,8 @@ def refresh(force=False):
                         if not _has_launch_event(rec['token']):
                             store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': None, 'by': rec['deployer'], 'tx': l['tx'], 'at': store.now()})
                 except Exception: pass
-            _ix['lastBlock'] = end                     # cursor survives restarts and slow passes
+            if end >= (_ix['lastBlock'] or 0): _ix['lastBlock'] = end   # cursors survive restarts and slow passes
+            if a <= (_ix.get('backfill') or head): _ix['backfill'] = a
             if time.time() > deadline: break
         _save_ix(); _ix['at'] = time.time()
         _purge_foreign()

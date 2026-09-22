@@ -118,7 +118,10 @@ class H(BaseHTTPRequestHandler):
         if p == 'candles': return self.send(200, pool.candles(q.get('token', ''), interval_s=max(60, int(q.get('interval', 300))), limit=min(int(q.get('limit', 200)), 500)))
         if p.startswith('token/') and p.endswith('/logo'):
             rec = pool.TOKENS.get(p[6:-5].lower())
-            if rec and rec.get('logo'): return self.send(302, headers={'Location': rec['logo']}, body=b'')
+            if rec and rec.get('logo'):
+                # served from our own origin: a third party host being slow or down never blanks a card
+                img = pool.logo_bytes(rec)
+                if img: return self.send(200, body=img[0], ctype=img[1], headers={'Cache-Control': 'public, max-age=86400'})
             svg = chain.avatar_svg(rec.get('symbol') if rec else None, p[6:-5])
             return self.send(200, body=svg.encode(), ctype='image/svg+xml', headers={'Cache-Control': 'public, max-age=3600'})
         if p.startswith('token/'):
