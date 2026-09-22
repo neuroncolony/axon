@@ -150,7 +150,7 @@ class H(BaseHTTPRequestHandler):
             if not rate_limit('quote:' + self.client_address[0], 60): return self.error(429, 'Slow down.')
             return self.send(200, chain.quote(q.get('token', ''), q.get('side', ''), q.get('amount', ''), q.get('sender', '')))
         if p == 'auth/me':
-            if not s: return self.error(401, 'Not signed in.')
+            if not s: return self.send(200, {'address': None})
             return self.send(200, {'address': s['address'], 'csrf': s['csrf'], **pool.entitlement(s['address'])})
         if p == 'keys':
             if not s: return self.error(401, 'Sign in with your wallet first.')

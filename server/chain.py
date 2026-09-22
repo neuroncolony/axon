@@ -111,6 +111,16 @@ def launched(token):
     return {'token':a(words[0]),'curve':a(words[1]),'deployer':a(words[2]),'creatorFeeRecipient':a(words[3]),'pairToken':a(words[4]),
             'graduationThreshold':str(u(words[5])),'poolFee':u(words[6]),'creatorTaxBps':u(words[8]),'buybackEnabled':bool(u(words[9])),'phase':u(words[10])}
 
+MODEL_TAG = re.compile(rb'axon:model=([\x21-\x7e]{1,64})')
+def model_from_tx(txhash):
+    """Recover the model id from the launch calldata: launch_tx() appends 'axon:model=<id>' to the on-chain description, so the registry can always be rebuilt from chain."""
+    try:
+        t = rpc('eth_getTransactionByHash', [txhash])
+        m = MODEL_TAG.search(bytes.fromhex((t or {}).get('input', '0x')[2:]))
+        return m.group(1).decode() if m else None
+    except Exception:
+        return None
+
 def curve_state(curve):
     """Reads from the bonding curve. Each call is isolated so one missing getter does not kill the row.
     The curve has no ethReserve()/totalRaised() getters; reserves come from getReserves() (virtual, wei scale)."""

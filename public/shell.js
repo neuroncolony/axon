@@ -91,7 +91,7 @@ window.AXON = (() => {
     session = await api('auth/verify', { address: state.address, signature: sig, nonce });
     renderNav(); return session;
   }
-  async function me() { if (session) return session; try { session = await api('auth/me'); if (session?.address && !state.address) state.address = session.address; } catch { session = null; } return session; }
+  async function me() { if (session) return session; try { const r = await api('auth/me'); session = r?.address ? r : null; if (session && !state.address) state.address = session.address; } catch { session = null; } return session; }
 
   // ---------- nav / footer
   function renderNav() {

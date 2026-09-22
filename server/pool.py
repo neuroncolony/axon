@@ -47,6 +47,7 @@ def register_launch(txhash, model, logo, description, socials=None):
     if found['status'] != '0x1': raise PoolError('The launch transaction reverted.')
     snap = chain.token_snapshot(found['token'])
     if not snap['fundedByAxon']: raise PoolError('This token does not route its creator fee to the axon treasury, so it is not an axon launch.')
+    if model not in M.BY_ID: model = chain.model_from_tx(txhash)
     rec = _record(snap, model if model in M.BY_ID else None, logo, description, txhash, found['block'])
     so = socials or {}; rec['socials'] = {k: str(so.get(k, ''))[:200] for k in ('website', 'x', 'telegram')}
     TOKENS[rec['token'].lower()] = rec; store.save('tokens')
@@ -67,6 +68,18 @@ def _purge_foreign():
         if r.lower() != t: TOKENS.pop(k, None); gone += 1
     if gone: store.save('tokens')
     return gone
+
+def _recover_models():
+    """Fill missing model ids from the launch calldata. Idempotent; each record is tried once per process."""
+    changed = 0
+    for rec in TOKENS.values():
+        if rec.get('model') or not rec.get('tx') or rec.get('_modelTried'): continue
+        rec['_modelTried'] = True
+        m = chain.model_from_tx(rec['tx'])
+        if m in M.BY_ID: rec['model'] = m; changed += 1
+    if changed: store.save('tokens')
+    return changed
+
 def _index_trades(head):
     """Pull Buy/Sell events for every adopted token since its lastTradeBlock. Chunks of 5000 blocks, deduped by tx+logIndex."""
     for key, rec in list(TOKENS.items()):
@@ -114,6 +127,7 @@ def refresh(force=False):
                 except Exception: pass
         _ix['lastBlock'] = head; _ix['at'] = time.time()
         _purge_foreign()
+        _recover_models()
         _index_trades(head)
         for rec in TOKENS.values():
             try: holders.index_holders(rec, head, TOKENS)
@@ -161,7 +175,7 @@ def enrich(rec, px=None, ts=None):
     last_rows = TRADES.get(rec['token'].lower(), [])
     last_at = last_rows[-1]['at'] if last_rows else None
     logo_url = '/api/token/' + rec['token'] + '/logo'
-    return {**rec, 'priceUsd': (rec.get('priceEth') or 0) * px if rec.get('priceEth') else None,
+    return {**{k: v for k, v in rec.items() if k != '_modelTried'}, 'priceUsd': (rec.get('priceEth') or 0) * px if rec.get('priceEth') else None,
             'marketCapUsd': (rec.get('marketCapEth') or 0) * px if rec.get('marketCapEth') else None,
             'volume24hEth': vol_eth, 'volume24hUsd': vol_eth * px, 'trades24h': n,
             'graduation': thr, 'status': 'Graduated' if graduated else 'Curve',
