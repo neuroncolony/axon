@@ -360,3 +360,14 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
 .devbuy input::placeholder{color:rgba(15,122,58,.55)}
 .devbuy input:focus{background:#fff;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,181,67,.18)}
 .devbuy input::-webkit-outer-spin-button,.devbuy input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.devbuy input[type=number]{-moz-appearance:textfield}
+/* official token slot: reserved first position, animated outline until the real token is configured */
+@property --oa{syntax:'<angle>';inherits:false;initial-value:0deg}
+.official-slot{position:relative;isolation:isolate}
+.official-slot::before{content:"";position:absolute;inset:-2px;border-radius:inherit;padding:2px;background:conic-gradient(from var(--oa),var(--blue) 0 22%,transparent 30% 48%,var(--blue) 52% 72%,transparent 80% 98%,var(--blue));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:official-spin 5s linear infinite;pointer-events:none;z-index:1}
+@keyframes official-spin{to{--oa:360deg}}
+.official-slot.placeholder{cursor:default;opacity:.92}.official-slot.placeholder .mkt-stats b,.official-slot.placeholder .mkt-sub .mono{color:var(--faint)}
+.official-row td:first-child{position:relative}.official-row td:first-child::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px;background:linear-gradient(180deg,var(--blue),transparent 50%,var(--blue));background-size:100% 200%;animation:official-bar 3s linear infinite}
+@keyframes official-bar{to{background-position:0 200%}}
+.chip.official{background:var(--blue);color:#fff}
+.official-logo{width:56px;height:56px;border-radius:18px;background:var(--blue-soft);display:grid;place-items:center;flex:none}.official-logo svg{width:22px;height:22px}
+.official-row .official-logo{width:32px;height:32px;border-radius:10px}.official-row .official-logo svg{width:18px;height:18px}

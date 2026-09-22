@@ -14,7 +14,7 @@ sys.path.insert(0, str(WORKSPACE)); sys.path.insert(0, str(ROOT / 'server'))
 try:
     from dotenv import load_dotenv; load_dotenv(WORKSPACE / '.env', override=False)
 except Exception: pass
-import chain, store, models as MODELS, pool, holders, personas, agora
+import chain, store, models as MODELS, pool, holders, personas, agora, official
 from eth_account.messages import encode_defunct
 from eth_account import Account
 
@@ -95,7 +95,8 @@ class H(BaseHTTPRequestHandler):
             print('GET error', path, repr(e), flush=True); return self.error(500, 'Server error.')
     def api_get(self, p, q):
         s = self.session()
-        if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled(), 'logoMirror': logos.mirror_enabled()})
+        if p == 'status': return self.send(200, {**chain.status(), 'brand': BRAND, 'chatEnabled': pool.chat_enabled(), 'logoMirror': logos.mirror_enabled(), 'official': official.official()})
+        if p == 'official': return self.send(200, official.official())
         if p.startswith('logo/'):
             b, mime = logos.get(p[5:])
             if not b: return self.error(404, 'No such logo.')

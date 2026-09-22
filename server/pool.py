@@ -2,7 +2,7 @@
 Money facts stated plainly: the 2% creator tax accrues in the pons escrow in ETH. A keeper claims it to the treasury wallet.
 This server reads the treasury balance and books spend per message at OpenRouter list price. It never holds keys or moves ETH."""
 import os, time, threading, secrets, hashlib, re
-import chain, store, models as M, holders, personas, agora, hidden
+import chain, store, models as M, holders, personas, agora, hidden, official
 try:
     from core.http_client import proxied_get, proxied_post
 except Exception:
@@ -189,7 +189,8 @@ def enrich(rec, px=None, ts=None):
             'volume24hEth': vol_eth, 'volume24hUsd': vol_eth * px, 'trades24h': n,
             'graduation': thr, 'status': 'Graduated' if graduated else 'Curve',
             'age': store.now() - rec.get('launchedAt', store.now()), 'modelName': M.BY_ID.get(rec.get('model') or '', {}).get('name'),
-            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url}
+            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url,
+            'official': rec['token'].lower() == (official.official()['token'] or '')}
 def _ours():
     t = (chain.treasury() or '').lower()
     if not t: return []
@@ -211,7 +212,13 @@ def token_list(sort='new', model=None, status=None, limit=50):
     if model: rows = [r for r in rows if r.get('model') == model]
     if status: rows = [r for r in rows if r['status'].lower() == status.lower()]
     key = {'mcap': lambda r: -(r.get('marketCapUsd') or 0), 'volume': lambda r: -(r.get('volume24hUsd') or 0), 'graduation': lambda r: -(r.get('graduation') or 0)}.get(sort, lambda r: -r.get('launchedAt', 0))
-    return sorted(rows, key=key)[:limit]
+    rows = sorted(rows, key=key)[:limit]
+    off = official.official()['token']
+    if off:
+        i = next((j for j, r in enumerate(rows) if r['token'].lower() == off), None)
+        if i is not None:
+            rows.insert(0, rows.pop(i)); rows[0]['official'] = True
+    return rows
 def token_detail(addr):
     if hidden.is_hidden(addr): raise PoolError('This token is not listed on axon.')
     rec = TOKENS.get(addr.lower())
