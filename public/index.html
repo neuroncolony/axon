@@ -47,8 +47,8 @@
 document.addEventListener('DOMContentLoaded', async () => {
   const { api, esc, fmtUsd, ago, pct, href, short, official, officialRow } = AXON;
   const usd = v => v == null ? '·' : fmtUsd(v);
-  const LOGO = t => AXON.href(t.logoUrl || ('/api/token/' + t.token + '/logo'));
-  const logoImg = t => `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${esc(AXON.href('/api/token/' + t.token + '/logo'))}'}">`;
+  const LOGO = t => t.rawLogoUrl || AXON.href('/api/token/' + t.token + '/logo');
+  const logoImg = t => { const fb = esc(AXON.href('/api/token/'+t.token+'/logo')); return `<img class="logo" src="${esc(LOGO(t))}" alt="" loading="lazy" onerror="if(!this.dataset.f){this.dataset.f=1;this.src='${fb}'}">`; };
 
   // blur wanders across the background capsules; hovering a blurred one clears it
   (function(){

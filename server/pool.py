@@ -261,7 +261,7 @@ def enrich(rec, px=None, ts=None):
             'volume24hEth': vol_eth, 'volume24hUsd': vol_eth * px, 'trades24h': n,
             'graduation': thr, 'status': 'Graduated' if graduated else 'Curve',
             'age': store.now() - rec.get('launchedAt', store.now()), 'modelName': M.BY_ID.get(rec.get('model') or '', {}).get('name'),
-            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url,
+            'explorer': chain.EXPLORER + '/address/' + rec['token'], 'lastTradeAt': last_at, 'logoUrl': logo_url, 'rawLogoUrl': rec.get('logo') or '',
             'official': rec['token'].lower() == (official.official()['token'] or '')}
 def _ours():
     t = (chain.treasury() or '').lower()
