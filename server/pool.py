@@ -100,9 +100,9 @@ def logo_bytes(rec):
     hit = LOGO_CACHE.get(url)
     if hit: return hit
     try:
-        import urllib.request
-        with urllib.request.urlopen(url, timeout=6) as r:
-            body = r.read(400000); ct = r.headers.get('Content-Type', 'image/png')
+        r = chain.proxied_get(url, headers={'SC-CALLER-ID': chain.CALLER, 'User-Agent': 'Mozilla/5.0 axon'}, timeout=8)
+        if r.status_code != 200: return None
+        body = r.content[:400000]; ct = r.headers.get('Content-Type', 'image/png')
         if not ct.startswith('image/'): return None
         LOGO_CACHE[url] = (body, ct)
         if len(LOGO_CACHE) > 200: LOGO_CACHE.pop(next(iter(LOGO_CACHE)))
@@ -182,12 +182,19 @@ def refresh(force=False):
         for a, end in spans:
             try: logs = chain.launch_logs(a, hex(end))
             except Exception: logs = []
-            for l in logs:
+            fresh = [l for l in logs if l['token'].lower() not in TOKENS and l['token'].lower() not in _NOT_OURS and not hidden.is_hidden(l['token'])]
+            recips = {}
+            if fresh:
+                # every unknown launch in this span checked in ONE round trip, so a span costs
+                # two requests instead of a hundred and the sweep actually reaches the newest blocks
+                try: recips = chain.fee_recipients([l['token'] for l in fresh])
+                except Exception: recips = {}
+            for l in fresh:
                 k = l['token'].lower()
-                if k in TOKENS or k in _NOT_OURS or hidden.is_hidden(l['token']): continue
                 try:
-                    # one eth_call decides it; only a real axon launch earns the full snapshot
-                    if chain.launched(l['token'])['creatorFeeRecipient'].lower() != tre:
+                    r = recips.get(k)
+                    if r is None: continue
+                    if r.lower() != tre:
                         _NOT_OURS.add(k); continue
                     snap = chain.token_snapshot(l['token'])
                     if not snap['fundedByAxon']: _NOT_OURS.add(k); continue

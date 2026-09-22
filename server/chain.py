@@ -60,6 +60,46 @@ def rpc(method, params):
         raise ChainError('RPC: ' + str(data.get('error', {}).get('message', 'no result')))
     return data['result']
 
+def rpc_batch(calls):
+    """Many read calls in ONE HTTP round trip. calls: [(method, params)]. Returns results in order,
+    None where a call errored. Keeps the sweep from paying a round trip per token."""
+    for m, _ in calls:
+        if m not in READ_METHODS: raise ChainError('Read method not permitted.')
+    out = [None] * len(calls)
+    for i in range(0, len(calls), 20):
+        chunk = calls[i:i + 20]
+        payload = [{'jsonrpc': '2.0', 'id': j, 'method': m, 'params': p} for j, (m, p) in enumerate(chunk)]
+        data = None
+        for attempt in range(4):
+            r = proxied_post(RPC, json=payload, headers={'SC-CALLER-ID': CALLER, 'User-Agent': 'Mozilla/5.0 axon'}, timeout=40)
+            if r.status_code in (429, 503) and attempt < 3:
+                time.sleep(0.6 * (2 ** attempt)); continue
+            if r.status_code != 200: break
+            data = r.json(); break
+        if data is None:                      # provider refused the batch: fall back to single calls
+            for j, (m, p2) in enumerate(chunk):
+                try: out[i + j] = rpc(m, p2)
+                except Exception: pass
+            continue
+        if isinstance(data, dict): data = [data]
+        for item in data:
+            j = item.get('id')
+            if isinstance(j, int) and 0 <= j < len(chunk) and 'result' in item: out[i + j] = item['result']
+    return out
+
+def fee_recipients(tokens):
+    """creatorFeeRecipient for a list of tokens, batched. {lowercase token: recipient or None}"""
+    calls = [('eth_call', [{'to': PONS, 'data': calldata('getLaunchedToken(address)', ['address'], [addr(t)])}, 'latest']) for t in tokens]
+    out = {}
+    for t, raw in zip(tokens, rpc_batch(calls)):
+        rec = None
+        try:
+            b = bytes.fromhex(raw[2:]); w = [b[i:i + 32] for i in range(0, len(b), 32)]
+            if len(w) >= 11: rec = to_checksum_address('0x' + w[3][-20:].hex())
+        except Exception: pass
+        out[t.lower()] = rec
+    return out
+
 def calldata(signature, types=(), values=()):
     return '0x' + (keccak(text=signature)[:4] + encode(list(types), list(values))).hex()
 
