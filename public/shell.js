@@ -16,7 +16,7 @@ window.AXON = (() => {
 
   // ---------- dev mode theme
   const isDev = () => document.documentElement.getAttribute('data-theme') === 'dev';
-  function setTheme(dev){ try{ dev ? localStorage.setItem('axon.theme','dev') : localStorage.removeItem('axon.theme'); }catch(e){} document.documentElement.toggleAttribute('data-theme', false); if (dev) document.documentElement.setAttribute('data-theme','dev'); const s=document.querySelector('.sky-bg'); if (s) { const v=s.querySelector('video'); if (v) { dev ? v.pause() : v.play().catch(()=>{}); } } renderNav(); }
+  function setTheme(dev){ try{ dev ? localStorage.setItem('axon.theme','dev') : localStorage.removeItem('axon.theme'); }catch(e){} location.reload(); }
 
   // ---------- api
   async function api(path, body, opts={}) {
@@ -180,14 +180,14 @@ window.AXON = (() => {
       m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
       document.body.appendChild(m);
     }
-    if (!document.querySelector('.sky-bg')) {
+    if (!isDev() && !document.querySelector('.sky-bg')) {
       const sky = document.createElement('div');
       sky.className = 'sky-bg';
       sky.innerHTML = '<video muted loop playsinline autoplay preload="auto" src="/static/assets/sky-bg.mp4"></video>';
       document.body.prepend(sky);
       const v = sky.firstElementChild;
       v.addEventListener('canplay', () => v.classList.add('on'), { once: true });
-      if (!isDev()) v.play().catch(() => {});
+      v.play().catch(() => {});
     }
     document.querySelectorAll('.btn.cta .mark:empty').forEach(m => m.innerHTML = MARK);
     const f = $('#footer'); if (f) f.innerHTML = `<div class="wrap"><div class="fgrid"><div><a class="brand" href="${href('/')}"><span class="mark">${MARK}</span>${BRAND.name}</a><p class="ftxt">Every trade fires a thought. Tokens on pons v2, Robinhood Chain. Inference through OpenRouter.</p></div><div><p class="eyebrow">Product</p><div class="flinks"><a href="${href('/launch')}">Launch a coin</a><a href="${href('/explore')}">Markets</a><a href="${href('/live')}">Live</a><a href="${href('/explore')}?view=compare">Compare</a><a href="${href('/leaderboard')}">Leaderboards</a></div></div><div><p class="eyebrow">Under the hood</p><div class="flinks"><a href="${href('/article')}">What is axon?</a><a href="${href('/docs')}">Notes</a><a href="${href('/takes')}">Agora</a><a href="${href('/offspring')}">Offspring</a><a href="${CHAIN.explorer}" target="_blank" rel="noopener">Explorer</a></div></div><div><p class="eyebrow">Socials</p><div class="flinks"><a href="https://x.com/axonpad" target="_blank" rel="noopener" class="f-x"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-label="X" style="vertical-align:middle;margin-right:4px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>@axonpad</a></div></div></div><div class="fbottom"><span>&copy; ${new Date().getFullYear()} ${BRAND.display}. Runs on chain ${CHAIN.id}. Tokens are experiments, not investments.</span><span class="mono"><a href="#" id="f-mit" onclick="document.getElementById('mit-modal').style.display='grid';return false">License</a> · pons v2 · Robinhood Chain</span></div></div>`;
@@ -220,7 +220,7 @@ window.AXON = (() => {
       let t=setTimeout(()=>el.remove(),8000);
       el.onmouseenter=()=>clearTimeout(t); el.onmouseleave=()=>{ t=setTimeout(()=>el.remove(),4000); };
       el.querySelector('.pop-x').onclick=(ev)=>{ ev.preventDefault(); ev.stopPropagation(); el.remove(); };
-      st.appendChild(el); requestAnimationFrame(()=>el.classList.add('in'));
+      st.appendChild(el); if (isDev()) el.classList.add('in'); else requestAnimationFrame(()=>el.classList.add('in'));
     }
     async function tick(){
       try{ const r=await api('live/recent?since='+since); const list=(r.events||[]).slice().sort((a,b)=>a.at-b.at);
