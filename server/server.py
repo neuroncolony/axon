@@ -89,6 +89,7 @@ class H(BaseHTTPRequestHandler):
             seg = path.split('/')
             if seg[0] in PAGES: return self.static(PAGES[seg[0]], page=True)
             return self.static(path or 'index.html')
+        except pool.PoolError as e: return self.error(404, str(e))
         except (ValueError, chain.ChainError) as e: return self.error(400, str(e))
         except Exception as e:
             print('GET error', path, repr(e), flush=True); return self.error(500, 'Server error.')
