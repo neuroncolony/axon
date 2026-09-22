@@ -401,3 +401,14 @@ h1 em,h2 em{font-style:normal;color:var(--blue-deep)}
   .mkt-grid{grid-template-columns:1fr}
   .mkt-card{border-radius:16px}
 }
+@media(max-width:640px){
+  .docs>*,.split>*,.card,.wrap{min-width:0}
+  .prose{overflow-wrap:anywhere}.prose .table-wrap{overflow:auto}
+  .toc{position:static!important;flex-direction:row;flex-wrap:wrap;gap:6px 10px;width:100%}
+  .tabs,.seg,.mkt-filters{display:flex;flex-wrap:wrap;max-width:100%;border-radius:20px}
+  .tabs button,.seg button{flex:1 1 auto}
+  .mkt-filters{gap:8px}.mkt-filters>*{flex:1 1 140px;min-width:0}
+  .field{min-width:0!important}
+  .field input,.field select{min-width:0;font-size:16px}
+}
+.keys-split{grid-template-columns:1fr 22rem}@media(max-width:640px){.keys-split{grid-template-columns:1fr!important}}
