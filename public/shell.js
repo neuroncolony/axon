@@ -64,7 +64,7 @@ window.AXON = (() => {
     m.innerHTML = `<div class="card modal-card gate-card">
       <div class="gate-mark">${MARK}</div>
       <h2 class="modal-title">Before you enter</h2>
-      <p>axon is a token launcher on Robinhood Chain. Tokens launched here are experimental, unaudited by any third party, and can go to zero. Nothing on this site is financial advice. Trades are on-chain and cannot be reversed.</p>
+      <p>axon is a token launcher on Robinhood Chain. Tokens launched here are experimental and can go to zero. Nothing on this site is financial advice. Trades are on-chain and cannot be reversed.</p>
       <p>By entering you confirm you are of legal age where you live, you are not in a restricted jurisdiction, and you accept the <a href="/docs#limits">honest limits</a> of this product.</p>
       <div class="gate-actions"><button class="btn ghost" data-leave>I do not accept</button><button class="btn accent" data-accept>Accept and enter</button></div>
     </div>`;

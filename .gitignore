@@ -7,3 +7,4 @@ data/*.tmp
 __pycache__/
 *.pyc
 _qa/
+_private/

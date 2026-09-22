@@ -11,6 +11,7 @@ except Exception:
 class PoolError(Exception): pass
 CALLER = {'SC-CALLER-ID': 'preview:axon'}
 OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions'
+POOL_SHARE = float(os.environ.get('AXON_POOL_SHARE', '0.25'))  # fraction of treasury inflow that funds model compute; internal knob
 def or_key(): return os.environ.get('OPENROUTER_API_KEY', '').strip()
 def chat_enabled(): return bool(or_key()) and bool(chain.treasury())
 
@@ -299,7 +300,7 @@ def takes(limit=60, token=None):
 
 def stats():
     px = eth_usd(); tb = chain.treasury_balance()
-    avail = (int(tb['balanceWei']) / 1e18 * px) if (tb['balanceWei'] and px) else None
+    avail = (int(tb['balanceWei']) / 1e18 * px * POOL_SHARE) if (tb['balanceWei'] and px) else None
     spent = LEDGER['spentUsd']
     return {'treasury': tb['treasury'], 'treasuryEth': chain.eth(int(tb['balanceWei'])) if tb['balanceWei'] else None, 'ethUsd': px, 'availableUsd': avail,
             'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}

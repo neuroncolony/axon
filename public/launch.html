@@ -10,7 +10,7 @@
       <form id="form">
         <label class="field"><span>Name</span><input id="f-name" maxlength="40" required><span class="hint">Shown on the token page and in markets.</span></label>
         <label class="field"><span>Symbol</span><input id="f-symbol" maxlength="12" required style="text-transform:uppercase" pattern="[A-Za-z0-9]{1,12}"><span class="hint">Uppercase, 1 to 12 characters.</span></label>
-        <label class="field"><span>Model</span><select id="f-model"><option>Loading catalogue…</option></select><span class="hint">The token funds this model. Every trade pays a 2% creator tax to the site treasury on top of the 1% pons fee. Launchers keep no fee share; the tax becomes compute that holders spend talking to the model.</span></label>
+        <label class="field"><span>Model</span><select id="f-model"><option>Loading catalogue…</option></select><span class="hint">The token funds this model. Every trade pays a 2% creator tax to the site treasury on top of the 1% pons fee. Launchers keep no fee share; the treasury funds the compute that holders spend talking to the model.</span></label>
         <label class="field"><span>Description</span><textarea id="f-desc" rows="4" maxlength="500"></textarea><span class="hint">Up to 500 characters.</span></label>
         <div class="field"><span>Logo</span>
           <div class="logo-pick" id="logo-pick">
@@ -43,7 +43,7 @@
       <div class="card" style="margin-top:1rem">
         <div class="eyebrow">Honest limits</div>
         <ul style="margin:.75rem 0 0;padding-left:1.1rem;display:flex;flex-direction:column;gap:8px;font-size:.875rem;color:var(--muted)">
-          <li>pons v2 is unaudited. Contracts can lose funds.</li>
+          <li>The pons v2 factory and curves are third-party code. Read them on the explorer before you trade.</li>
           <li>The keeper sweep that moves escrow to the treasury is off-chain. Its wallet is public.</li>
           <li>The model a token backs can be changed later only by relaunching a new token.</li>
         </ul>
