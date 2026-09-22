@@ -302,6 +302,8 @@ def takes(limit=60, token=None):
 
 SPENT_BASELINE_USD = float(os.environ.get('AXON_SPENT_BASELINE_USD', '0') or 0)  # pre-launch test spend written off so the public pool starts clean
 def spent_usd(): return round(max(0.0, LEDGER['spentUsd'] - SPENT_BASELINE_USD), 6)
+MESSAGES_BASELINE = int(os.environ.get('AXON_MESSAGES_BASELINE', '0') or 0)
+def messages_count(): return max(0, LEDGER['messages'] - MESSAGES_BASELINE)
 POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
 def fee_inflow_eth():
     """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
@@ -322,7 +324,7 @@ def stats():
     avail = (reserve * px) if px else None
     spent = spent_usd()
     return {'treasury': tb['treasury'], 'treasuryEth': chain.eth(int(tb['balanceWei'])) if tb['balanceWei'] else None, 'ethUsd': px, 'availableUsd': avail,
-            'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
+            'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': messages_count(), 'chatEnabled': chat_enabled()}
 def owner_view():
     """Private accounting for the treasury wallet only. Never served without a signed session matching the treasury."""
     px = eth_usd() or 0; tb = chain.treasury_balance(); inflow, reserve, owner = _split()
