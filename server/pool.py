@@ -300,6 +300,8 @@ def takes(limit=60, token=None):
     rows = hidden.visible(rows)
     return sorted(rows, key=lambda r: -r.get('at', 0))[:limit]
 
+SPENT_BASELINE_USD = float(os.environ.get('AXON_SPENT_BASELINE_USD', '0') or 0)  # pre-launch test spend written off so the public pool starts clean
+def spent_usd(): return round(max(0.0, LEDGER['spentUsd'] - SPENT_BASELINE_USD), 6)
 POOL_RELEASE_ETH = float(os.environ.get('AXON_POOL_RELEASE_ETH', '0') or 0)  # cumulative ETH moved from the compute reserve to the owner share (set after a launch winds down)
 def fee_inflow_eth():
     """Total creator tax earned across every axon token, from indexed on-chain trades (accrued, whether or not claimed yet)."""
@@ -318,17 +320,17 @@ def stats():
     px = eth_usd(); tb = chain.treasury_balance()
     inflow, reserve, owner = _split()
     avail = (reserve * px) if px else None
-    spent = LEDGER['spentUsd']
+    spent = spent_usd()
     return {'treasury': tb['treasury'], 'treasuryEth': chain.eth(int(tb['balanceWei'])) if tb['balanceWei'] else None, 'ethUsd': px, 'availableUsd': avail,
             'spentUsd': spent, 'raisedUsd': (avail + spent) if avail is not None else None, 'launches': len(_ours()), 'messages': LEDGER['messages'], 'chatEnabled': chat_enabled()}
 def owner_view():
     """Private accounting for the treasury wallet only. Never served without a signed session matching the treasury."""
     px = eth_usd() or 0; tb = chain.treasury_balance(); inflow, reserve, owner = _split()
-    spent_eth = (LEDGER['spentUsd'] / px) if px else None
+    spent_eth = (spent_usd() / px) if px else None
     bal = int(tb['balanceWei']) / 1e18 if tb['balanceWei'] else None
     return {'treasury': tb['treasury'], 'walletEth': bal, 'feeInflowEth': inflow, 'ownerShareEth': owner, 'ownerShareUsd': owner * px if px else None,
-            'reserveEth': reserve, 'reserveUsd': reserve * px if px else None, 'spentUsd': LEDGER['spentUsd'], 'spentEth': spent_eth,
-            'reserveLeftUsd': (reserve * px - LEDGER['spentUsd']) if px else None, 'releasedEth': POOL_RELEASE_ETH, 'ethUsd': px}
+            'reserveEth': reserve, 'reserveUsd': reserve * px if px else None, 'spentUsd': spent_usd(), 'spentEth': spent_eth,
+            'reserveLeftUsd': (reserve * px - spent_usd()) if px else None, 'releasedEth': POOL_RELEASE_ETH, 'ethUsd': px}
 def entitlement(address):
     a = address.lower(); owned = [r for r in _ours() if r['deployer'].lower() == a]
     return {'hasLaunched': bool(owned), 'launches': [{'token': r['token'], 'symbol': r.get('symbol'), 'model': r.get('model')} for r in owned],
