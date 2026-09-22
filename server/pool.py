@@ -42,10 +42,12 @@ def _record(snap, model=None, logo='', description='', tx=None, block=None):
             'launchedAt': store.now(), 'block': block, 'phase': snap['phase'], 'priceEth': snap['priceEth'], 'marketCapEth': snap['marketCapEth'],
             'curveState': snap['curve_state'], 'updatedAt': store.now()}
 
-def register_launch(txhash, model, logo, description, socials=None):
+def register_launch(txhash, model, logo, description, socials=None, caller=None):
     found = chain.token_from_receipt(txhash)
     if not found: raise PoolError('That transaction has no pons v2 launch event yet. Wait a block and retry.')
     if found['status'] != '0x1': raise PoolError('The launch transaction reverted.')
+    sender = (chain.receipt(txhash) or {}).get('from', '')
+    if not caller or not sender or caller.lower() != sender.lower(): raise PoolError('Only the wallet that sent the launch transaction can register it.')
     if hidden.is_hidden(found['token']): raise PoolError('This token is not listed on axon.')
     snap = chain.token_snapshot(found['token'])
     if not snap['fundedByAxon']: raise PoolError('This token does not route its creator fee to the axon treasury, so it is not an axon launch.')
@@ -331,6 +333,19 @@ def entitlement(address):
     a = address.lower(); owned = [r for r in _ours() if r['deployer'].lower() == a]
     return {'hasLaunched': bool(owned), 'launches': [{'token': r['token'], 'symbol': r.get('symbol'), 'model': r.get('model')} for r in owned],
             'spentUsd': LEDGER['byAddress'].get(a, 0.0), 'chatEnabled': chat_enabled()}
+_BUDGET = threading.Lock()
+_RESERVED = {'usd': 0.0}
+def _reserve(model, max_tokens=700, prompt_tokens=6000):
+    """Atomically check the budget and hold a worst-case reservation for one call. Returns the reserved USD."""
+    est = max(0.001, M.cost_usd(model, prompt_tokens, max_tokens))
+    with _BUDGET:
+        st = stats()
+        if st['availableUsd'] is not None and st['availableUsd'] - st['spentUsd'] - _RESERVED['usd'] - est <= 0.01:
+            raise PoolError('The compute pool is spent. Trades refill it.')
+        _RESERVED['usd'] = round(_RESERVED['usd'] + est, 6)
+    return est
+def _release(est):
+    with _BUDGET: _RESERVED['usd'] = round(max(0.0, _RESERVED['usd'] - est), 6)
 def _bill(address, model, usage):
     cost = M.cost_usd(model, usage.get('prompt_tokens', 0), usage.get('completion_tokens', 0))
     LEDGER['spentUsd'] = round(LEDGER['spentUsd'] + cost, 6); LEDGER['messages'] += 1
@@ -355,9 +370,10 @@ SYSTEM = "You are answering inside axon, a launchpad on Robinhood Chain where 2%
 def chat(address, model, messages, source='web', system_extra=''):
     if model not in M.BY_ID: raise PoolError('Pick a listed model.')
     if not entitlement(address)['hasLaunched']: raise PoolError('Chat is open to wallets that have launched a token here. Launch one, then come back.')
-    st = stats()
-    if st['availableUsd'] is not None and st['availableUsd'] - st['spentUsd'] <= 0.01: raise PoolError('The compute pool is spent. Trades refill it.')
-    msgs = _clean(messages); text, usage = _openrouter(model, msgs, system=(system_extra + ' ' + SYSTEM).strip()); cost = _bill(address, model, usage)
+    msgs = _clean(messages); est = _reserve(model)
+    try: text, usage = _openrouter(model, msgs, system=(system_extra + ' ' + SYSTEM).strip())
+    except Exception: _release(est); raise
+    cost = _bill(address, model, usage); _release(est); st = stats()
     store.append('chat', {'address': address.lower(), 'model': model, 'q': msgs[-1]['content'][:2000], 'a': text[:6000], 'usage': usage, 'costUsd': cost, 'source': source, 'at': store.now()})
     return {'reply': text, 'usage': usage, 'costUsd': cost, 'poolAvailableUsd': (st['availableUsd'] - st['spentUsd'] - cost) if st['availableUsd'] is not None else None}
 def history(address, model=''):
@@ -407,9 +423,10 @@ def run_agents(max_tokens=1):
         if hidden.is_hidden(rec.get('token')): continue
         if store.now() - rec.get('lastTakeAt', 0) < 20 * 3600: continue
         try:
-            e = enrich(rec); settle_bets(rec, e)
-            text, usage = _openrouter(rec['model'], [{'role': 'user', 'content': 'Give your daily take on your own token. End with exactly one final line "CALL: up", "CALL: down" or "CALL: stay" for your market cap 24 hours from now.'}], max_tokens=260, system=agent_context(rec))
-            cost = _bill(rec['deployer'], rec['model'], usage)
+            e = enrich(rec); settle_bets(rec, e); est = _reserve(rec['model'])
+            try: text, usage = _openrouter(rec['model'], [{'role': 'user', 'content': 'Give your daily take on your own token. End with exactly one final line "CALL: up", "CALL: down" or "CALL: stay" for your market cap 24 hours from now.'}], max_tokens=260, system=agent_context(rec))
+            except Exception: _release(est); raise
+            cost = _bill(rec['deployer'], rec['model'], usage); _release(est)
             m = re.search(r'CALL:\s*(up|down|stay)', text, re.I); call = m.group(1).lower() if m else 'stay'
             body = re.sub(r'\n?CALL:.*$', '', text, flags=re.I | re.S).strip()
             store.append('takes', {'token': rec['token'], 'symbol': rec.get('symbol'), 'model': rec['model'], 'body': body, 'costUsd': cost, 'at': store.now()})

@@ -205,9 +205,10 @@ class H(BaseHTTPRequestHandler):
                 if not rate_limit('prep:' + ip, 20): return self.error(429, 'Slow down.')
                 return self.send(200, chain.launch_tx(d))
             if p == 'launch/confirm':
-                if not rate_limit('confirm:' + ip, 20): return self.error(429, 'Slow down.')
+                if not s or not self.csrf_ok(s): return self.error(401, 'Sign in with the wallet that launched the token.')
+                if not rate_limit('confirm:' + s['address'], 20): return self.error(429, 'Slow down.')
                 return self.send(200, pool.register_launch(d.get('tx', ''), d.get('model', ''), d.get('logo', ''), d.get('description', ''),
-                                                            socials={'website': d.get('website', ''), 'x': d.get('x', ''), 'telegram': d.get('telegram', '')}))
+                                                            socials={'website': d.get('website', ''), 'x': d.get('x', ''), 'telegram': d.get('telegram', '')}, caller=s['address']))
             if p == 'trade/prepare':
                 if not rate_limit('trade:' + ip, 30): return self.error(429, 'Slow down.')
                 return self.send(200, chain.trade_tx(d))
@@ -217,7 +218,9 @@ class H(BaseHTTPRequestHandler):
                 if not r or r.get('status') != '0x1': return self.error(400, 'Trade not confirmed yet.')
                 return self.send(200, pool.record_trade(chain.addr(d.get('token', '')), d.get('side', 'buy'), int(d.get('ethWei', 0)), r.get('from'), d.get('tx')))
             if p == 'agents/run':
-                if not rate_limit('agents:' + ip, 2, 600): return self.error(429, 'Agents already ran recently.')
+                t = (chain.treasury() or '').lower()
+                if not s or not self.csrf_ok(s) or not t or s['address'].lower() != t: return self.error(403, 'Agents run on their own schedule.')
+                if not rate_limit('agents:' + s['address'], 2, 600): return self.error(429, 'Agents already ran recently.')
                 return self.send(200, pool.run_agents(max_tokens=int(d.get('n', 1))))
             if p in ('persona', 'memory', 'memory/delete', 'compare'):
                 if not s or not self.csrf_ok(s): return self.error(401, 'Sign in with your wallet first.')

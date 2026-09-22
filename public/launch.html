@@ -218,6 +218,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       devBuyWei();
       const prep = await api('launch/prepare', { name, symbol, description, logo: logoUrl, model, website, twitter, telegram });
       const { hash } = await sendTx(prep.tx, prep.tx.to);
+      submit.textContent = 'Sign to register…';
+      try { await AXON.login(); } catch (e) { AXON.toast('Sign the message so we can register your token.'); }
       let done = null;
       for (let i = 0; i <= 6; i++) {
         try { done = await api('launch/confirm', { tx: hash, model, logo: logoUrl, description }); break; }
