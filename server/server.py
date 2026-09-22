@@ -270,7 +270,13 @@ class H(BaseHTTPRequestHandler):
         if page or f.suffix == '.html':
             body = body.replace(b'{{BRAND}}', BRAND['name'].encode()).replace(b'{{BRAND_DISPLAY}}', BRAND['displayName'].encode()).replace(b'{{DESCRIPTION}}', BRAND['description'].encode())
             ctype = 'text/html'
-        return self.send(code, body=body, ctype=ctype, headers={'Cache-Control': 'no-cache' if f.suffix == '.html' else 'public, max-age=300'})
+        # js and css must never go stale in a browser tab that was open across a deploy
+        fresh = f.suffix in ('.html', '.js', '.css')
+        h = {'Cache-Control': 'no-cache, must-revalidate' if fresh else 'public, max-age=300'}
+        if fresh: h['ETag'] = '"%x-%x"' % (int(f.stat().st_mtime), len(body))
+        if h.get('ETag') and self.headers.get('If-None-Match') == h['ETag']:
+            return self.send(304, body=b'', ctype=ctype, headers=h)
+        return self.send(code, body=body, ctype=ctype, headers=h)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8791))
