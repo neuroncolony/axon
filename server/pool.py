@@ -1,7 +1,7 @@
 """axon compute pool: token registry, indexer, entitlement, OpenRouter billing, API keys, agents (takes), bets (scoreboard).
 Money facts stated plainly: the 2% creator tax accrues in the pons escrow in ETH. A keeper claims it to the treasury wallet.
 This server reads the treasury balance and books spend per message at OpenRouter list price. It never holds keys or moves ETH."""
-import os, time, threading, secrets, hashlib, re
+import os, sys, time, threading, secrets, hashlib, re
 import chain, store, models as M, holders, personas, agora, hidden, official
 try:
     from core.http_client import proxied_get, proxied_post
@@ -53,7 +53,7 @@ def register_launch(txhash, model, logo, description, socials=None, caller=None)
     if not snap['fundedByAxon']: raise PoolError('This token does not route its creator fee to the axon treasury, so it is not an axon launch.')
     if model not in M.BY_ID: model = chain.model_from_tx(txhash)
     rec = _record(snap, model if model in M.BY_ID else None, logo, description, txhash, found['block'])
-    so = socials or {}; rec['socials'] = {k: str(so.get(k, ''))[:200] for k in ('website', 'x', 'telegram')}
+    so = socials or {}; rec['socials'] = {k: (str(so.get(k, ''))[:200] if str(so.get(k, '')).lower().startswith('https://') else '') for k in ('website', 'x', 'telegram')}
     TOKENS[rec['token'].lower()] = rec; store.save('tokens')
     if not _has_launch_event(rec['token']):
         store.append('events', {'type': 'launch', 'token': rec['token'], 'symbol': rec['symbol'], 'model': rec['model'], 'by': rec['deployer'], 'tx': txhash, 'at': store.now()})
@@ -346,8 +346,18 @@ def _reserve(model, max_tokens=700, prompt_tokens=6000):
     return est
 def _release(est):
     with _BUDGET: _RESERVED['usd'] = round(max(0.0, _RESERVED['usd'] - est), 6)
-def _bill(address, model, usage):
+KEY_DAILY_CAP_USD = float(os.environ.get('AXON_KEY_DAILY_CAP_USD', '5') or 5)
+def _bill_key(key, cost):
+    v = KEYS.get(key)
+    if not v: return
+    day = int(time.time() // 86400)
+    if v.get('capDay') != day: v['capDay'] = day; v['daySpentUsd'] = 0.0
+    v['daySpentUsd'] = round(v.get('daySpentUsd', 0.0) + cost, 6); v['spentUsd'] = round(v.get('spentUsd', 0.0) + cost, 6)
+    if v['daySpentUsd'] > KEY_DAILY_CAP_USD: v['revoked'] = True; v['revokedReason'] = 'daily cap'
+    store.save('keys')
+def _bill(address, model, usage, key=None):
     cost = M.cost_usd(model, usage.get('prompt_tokens', 0), usage.get('completion_tokens', 0))
+    if key: _bill_key(key, cost)
     LEDGER['spentUsd'] = round(LEDGER['spentUsd'] + cost, 6); LEDGER['messages'] += 1
     LEDGER['byModel'][model] = round(LEDGER['byModel'].get(model, 0) + cost, 6)
     LEDGER['byAddress'][address.lower()] = round(LEDGER['byAddress'].get(address.lower(), 0) + cost, 6)
@@ -357,7 +367,9 @@ def _openrouter(model, messages, max_tokens=700, system=None):
     msgs = ([{'role': 'system', 'content': system}] if system else []) + messages
     r = proxied_post(OPENROUTER, headers={'Authorization': 'Bearer ' + or_key(), 'Content-Type': 'application/json', 'X-Title': 'axon', **CALLER},
                      json={'model': model, 'messages': msgs, 'max_tokens': max_tokens}, timeout=90)
-    if r.status_code >= 400: raise PoolError('Model call failed: ' + r.text[:160])
+    if r.status_code >= 400:
+        print('openrouter error', r.status_code, r.text[:300], file=sys.stderr, flush=True)
+        raise PoolError('The model call failed. Try again in a moment.')
     d = r.json(); return d['choices'][0]['message']['content'], d.get('usage', {})
 def _clean(messages):
     if not isinstance(messages, list) or not messages or len(messages) > 40: raise PoolError('Send 1 to 40 messages.')
@@ -367,13 +379,13 @@ def _clean(messages):
         out.append({'role': m['role'], 'content': m['content'][:6000]})
     return out
 SYSTEM = "You are answering inside axon, a launchpad on Robinhood Chain where 2% of every token trade funds model inference. Be direct and concise."
-def chat(address, model, messages, source='web', system_extra=''):
+def chat(address, model, messages, source='web', system_extra='', key=None):
     if model not in M.BY_ID: raise PoolError('Pick a listed model.')
     if not entitlement(address)['hasLaunched']: raise PoolError('Chat is open to wallets that have launched a token here. Launch one, then come back.')
     msgs = _clean(messages); est = _reserve(model)
     try: text, usage = _openrouter(model, msgs, system=(system_extra + ' ' + SYSTEM).strip())
     except Exception: _release(est); raise
-    cost = _bill(address, model, usage); _release(est); st = stats()
+    cost = _bill(address, model, usage, key=key); _release(est); st = stats()
     store.append('chat', {'address': address.lower(), 'model': model, 'q': msgs[-1]['content'][:2000], 'a': text[:6000], 'usage': usage, 'costUsd': cost, 'source': source, 'at': store.now()})
     return {'reply': text, 'usage': usage, 'costUsd': cost, 'poolAvailableUsd': (st['availableUsd'] - st['spentUsd'] - cost) if st['availableUsd'] is not None else None}
 def history(address, model=''):
@@ -389,6 +401,7 @@ def create_key(address, label):
     store.save('keys'); return {'key': raw, 'record': {**KEYS[h], 'id': h[:12]}}
 def list_keys(address): return [{**v, 'id': k[:12]} for k, v in KEYS.items() if v['address'] == address.lower() and not v.get('revoked')]
 def revoke_key(address, kid):
+    if len(kid or '') != 12: raise PoolError('Bad key id.')
     for k, v in KEYS.items():
         if k.startswith(kid) and v['address'] == address.lower(): v['revoked'] = True
     store.save('keys'); return list_keys(address)
@@ -396,8 +409,8 @@ def key_owner(raw):
     v = KEYS.get(hashlib.sha256(raw.encode()).hexdigest())
     if v and not v.get('revoked'): v['calls'] += 1; return v['address']
     return None
-def completions(address, body):
-    model = body.get('model', ''); res = chat(address, model, body.get('messages', []), source='api')
+def completions(address, body, key=None):
+    model = body.get('model', ''); res = chat(address, model, body.get('messages', []), source='api', key=key)
     return {'id': 'axon-' + secrets.token_hex(6), 'object': 'chat.completion', 'model': model, 'created': store.now(),
             'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': res['reply']}, 'finish_reason': 'stop'}], 'usage': res['usage'],
             'axon': {'costUsd': res['costUsd'], 'poolAvailableUsd': res['poolAvailableUsd']}}

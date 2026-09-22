@@ -54,6 +54,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header('Content-Type', ctype + ('; charset=utf-8' if ctype.startswith('text') or ctype == 'application/json' else ''))
         self.send_header('Content-Length', str(len(payload)))
         self.send_header('X-Content-Type-Options', 'nosniff'); self.send_header('Referrer-Policy', 'same-origin')
+        self.send_header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); self.send_header('X-Frame-Options', 'SAMEORIGIN'); self.send_header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         for k, v in (headers or {}).items(): self.send_header(k, v)
         self.end_headers(); self.wfile.write(payload)
     def error(self, code, msg): self.send(code, {'error': msg})
@@ -120,7 +121,9 @@ class H(BaseHTTPRequestHandler):
             if rec and rec.get('logo'): return self.send(302, headers={'Location': rec['logo']}, body=b'')
             svg = chain.avatar_svg(rec.get('symbol') if rec else None, p[6:-5])
             return self.send(200, body=svg.encode(), ctype='image/svg+xml', headers={'Cache-Control': 'public, max-age=3600'})
-        if p.startswith('token/'): return self.send(200, pool.token_detail(p[6:]))
+        if p.startswith('token/'):
+            if not rate_limit('tok:' + self.client_address[0], 60): return self.error(429, 'Slow down.')
+            return self.send(200, pool.token_detail(p[6:]))
         if p == 'live/recent':
             try: since = int(q.get('since', 0))
             except (TypeError, ValueError): since = 0
@@ -129,9 +132,6 @@ class H(BaseHTTPRequestHandler):
             rec = pool.TOKENS.get(q.get('token', '').lower())
             if not rec: return self.error(404, 'Unknown token.')
             out = holders.holders(rec['token'], rec, limit=min(int(q.get('limit', 50)), 200)); out['lastHolderBlock'] = rec.get('lastHolderBlock')
-            if q.get('probe'):
-                try: out['probe'] = {'launchBlockLogs': len(chain.transfer_logs(rec['token'], rec['block'], rec['block'])), 'reindexed': holders.index_holders(rec, int(rec['block']) + 10, TOKENS_ref_not_needed=pool.TOKENS) if q.get('probe') == 'fix' else None}
-                except Exception as e: out['probe'] = {'error': repr(e)}
             return self.send(200, out)
         if p in ('persona', 'persona/history', 'memory'):
             rec = pool.TOKENS.get(q.get('token', '').lower())
@@ -177,8 +177,13 @@ class H(BaseHTTPRequestHandler):
                 if not logos.rate_ok(ip): return self.error(429, 'Too many uploads. Try again in a minute.')
                 return self.send(200, logos.put(d.get('data', ''), self.origin()))
             if p == 'auth/nonce':
-                a = chain.addr(d.get('address', '')); n = secrets.token_hex(16); NONCES[n] = (a, time.time())
-                msg = f"{BRAND['displayName']} wants you to sign in with your wallet.\n\nAddress: {a}\nChain: {chain.CHAIN_ID}\nNonce: {n}\nIssued: {store.now()}\n\nThis signature costs nothing and moves no funds."
+                if not rate_limit('nonce:' + ip, 20): return self.error(429, 'Slow down.')
+                now = time.time()
+                for k in [k for k, v in NONCES.items() if now - v[1] > 600]: NONCES.pop(k, None)
+                if len(NONCES) > 5000:
+                    for k in sorted(NONCES, key=lambda k: NONCES[k][1])[:len(NONCES) // 2]: NONCES.pop(k, None)
+                a = chain.addr(d.get('address', '')); n = secrets.token_hex(16); issued = store.now(); NONCES[n] = (a, now, issued)
+                msg = f"{BRAND['displayName']} wants you to sign in with your wallet.\n\nAddress: {a}\nChain: {chain.CHAIN_ID}\nNonce: {n}\nIssued: {issued}\n\nThis signature costs nothing and moves no funds."
                 return self.send(200, {'nonce': n, 'message': msg})
             if p == 'auth/verify':
                 n = d.get('nonce', ''); rec = NONCES.pop(n, None)
@@ -189,7 +194,7 @@ class H(BaseHTTPRequestHandler):
                 # recover and compare (issued timestamp was inside the message: re-derive by scanning candidates within the 5 minute window)
                 sig = d.get('signature', '')
                 ok = False
-                for ts in range(int(rec[1]) - 2, int(rec[1]) + 300):
+                for ts in [rec[2]]:
                     full = msg + str(ts) + "\n\nThis signature costs nothing and moves no funds."
                     try:
                         if Account.recover_message(encode_defunct(text=full), signature=sig).lower() == a.lower(): ok = True; break
@@ -243,9 +248,12 @@ class H(BaseHTTPRequestHandler):
             if p == 'v1/chat/completions':
                 owner = self.api_key_user()
                 if not owner: return self.error(401, 'Invalid API key.')
-                if not rate_limit('key:' + owner, 30): return self.error(429, 'Rate limited.')
-                return self.send(200, pool.completions(owner, d))
+                kh = hashlib.sha256((self.headers.get('Authorization', '').split(' ', 1)[-1] or '').strip().encode()).hexdigest()
+                if not rate_limit('key:' + kh, 20): return self.error(429, 'Rate limited.')
+                return self.send(200, pool.completions(owner, d, key=kh))
             if p == 'refresh':
+                t = (chain.treasury() or '').lower()
+                if not s or not self.csrf_ok(s) or not t or s['address'].lower() != t: return self.error(403, 'The indexer refreshes on its own schedule.')
                 if not rate_limit('refresh:' + ip, 4): return self.error(429, 'Slow down.')
                 return self.send(200, pool.refresh(force=True))
             return self.error(404, 'Unknown endpoint.')

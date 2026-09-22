@@ -10,9 +10,9 @@ try:
 except Exception:
     from compat import proxied_get, proxied_post
 
-RPC = 'https://rpc.mainnet.chain.robinhood.com'
-PONS = '0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e'
-ESCROW = '0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e'
+RPC = os.environ.get('AXON_RPC', '').strip() or 'https://rpc.mainnet.chain.robinhood.com'
+PONS = (os.environ.get('AXON_PONS_FACTORY', '').strip() or '0x7ed598bcef8bd9edd8c97a195c6d13f40801ec7e').lower()
+ESCROW = (os.environ.get('AXON_PONS_ESCROW', '').strip() or '0xd3afeb2a57f70ef218aa82451c51b2fb0416ac9e').lower()
 ZERO = '0x' + '0' * 40
 CHAIN_ID = 4663
 CALLER = 'preview:axon'
